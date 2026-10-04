@@ -1,7 +1,11 @@
 import json, sys, os
+from pathlib import Path
 import requests
-BASE="http://localhost:8000/api"
-S=json.load(open("/Users/siva/tax shield/tax-shield/tests/taxshield_persona_test_cases.json"))["test_suite"]["test_cases"]
+BASE = os.environ.get("TAXSHIELD_API_URL", "http://localhost:8000/api")
+# Windows-safe: resolve test data relative to this file, not a hardcoded macOS path.
+_TESTS_DIR = Path(__file__).resolve().parents[1]
+_JSON_PATH = _TESTS_DIR / "taxshield_persona_test_cases.json"
+S = json.loads(_JSON_PATH.read_text(encoding="utf-8"))["test_suite"]["test_cases"]
 # tax calc mirror of engine
 def liability(t):
     if t<=250000: return 0

@@ -12,8 +12,9 @@ import { Select } from '@/components/ui/Select';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
+import { Pager } from '@/components/ui/Pager';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
-import { Plus, Upload, Download, Filter, Search, Trash2, Edit } from 'lucide-react';
+import { Plus, Upload, Download, Filter, Search, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function TransactionsPage() {
@@ -22,9 +23,10 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [filters, setFilters] = useState({ type: '', category: '', search: '' });
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 20;
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -38,9 +40,9 @@ export default function TransactionsPage() {
     frequency: '',
   });
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = async (p = page) => {
     try {
-      const data = await api.getTransactions();
+      const data = await api.getTransactionsPaginated(p * PAGE_SIZE, PAGE_SIZE);
       setTransactions(data);
     } catch {
       toast.error('Failed to load transactions');
@@ -51,41 +53,32 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     fetchTransactions();
+    if (typeof window !== 'undefined' && window.location.search.includes('action=new')) {
+      resetForm();
+      setShowModal(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchTransactions(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (editingTransaction) {
-        await api.createTransaction({ ...formData, amount: parseFloat(formData.amount), tax_deducted: parseFloat(formData.tax_deducted) });
-        toast.success('Transaction updated');
-      } else {
-        await api.createTransaction({ ...formData, amount: parseFloat(formData.amount), tax_deducted: parseFloat(formData.tax_deducted) });
-        toast.success('Transaction added');
-      }
+      await api.createTransaction({ ...formData, amount: parseFloat(formData.amount), tax_deducted: parseFloat(formData.tax_deducted) });
+      toast.success('Transaction added');
       setShowModal(false);
-      setEditingTransaction(null);
       resetForm();
-      fetchTransactions();
+      setPage(0);
+      setLoading(true);
+      fetchTransactions(0);
     } catch {
       toast.error('Failed to save transaction');
     }
-  };
-
-  const handleEdit = (transaction: Transaction) => {
-    setEditingTransaction(transaction);
-    setFormData({
-      date: transaction.date.split('T')[0],
-      description: transaction.description,
-      amount: transaction.amount.toString(),
-      transaction_type: transaction.transaction_type,
-      category: transaction.category,
-      source: transaction.source || '',
-      tax_treatment: transaction.tax_treatment || '',
-      tax_deducted: transaction.tax_deducted.toString(),
-      frequency: transaction.frequency || '',
-    });
-    setShowModal(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -160,12 +153,8 @@ export default function TransactionsPage() {
     return true;
   });
 
-  const typeColors = {
-    income: 'bg-green-100 text-green-800',
-    expense: 'bg-red-100 text-red-800',
-    investment: 'bg-blue-100 text-blue-800',
-    deduction: 'bg-purple-100 text-purple-800',
-  };
+  const typeVariant = (t: string) =>
+    t === 'income' ? 'success' : t === 'expense' ? 'danger' : t === 'investment' ? 'info' : 'default';
 
   return (
     <DashboardLayout>
@@ -180,7 +169,7 @@ export default function TransactionsPage() {
               <Upload className="h-4 w-4 mr-2" />
               Import CSV
             </Button>
-            <Button onClick={() => { setEditingTransaction(null); resetForm(); setShowModal(true); }}>
+            <Button onClick={() => { resetForm(); setShowModal(true); }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Transaction
             </Button>
@@ -260,7 +249,7 @@ export default function TransactionsPage() {
                         <TableCell>{formatDate(transaction.date)}</TableCell>
                         <TableCell className="font-medium">{transaction.description}</TableCell>
                         <TableCell>
-                          <Badge variant={typeColors[transaction.transaction_type] as any}>
+                          <Badge variant={typeVariant(transaction.transaction_type)}>
                             {transaction.transaction_type}
                           </Badge>
                         </TableCell>
@@ -274,10 +263,7 @@ export default function TransactionsPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleEdit(transaction)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(transaction.id)}>
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete(transaction.id)} aria-label={`Delete ${transaction.description}`}>
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           </div>
@@ -289,12 +275,21 @@ export default function TransactionsPage() {
               </div>
             )}
           </CardContent>
+          <div className="px-4 border-t border-gray-100">
+            <Pager
+              page={page}
+              pageSize={PAGE_SIZE}
+              hasMore={filteredTransactions.length === PAGE_SIZE}
+              count={filteredTransactions.length}
+              onPage={(p) => { setLoading(true); setPage(p); }}
+            />
+          </div>
         </Card>
 
         <Modal
           isOpen={showModal}
-          onClose={() => { setShowModal(false); setEditingTransaction(null); resetForm(); }}
-          title={editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
+          onClose={() => { setShowModal(false); resetForm(); }}
+          title="Add Transaction"
           size="lg"
         >
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -389,11 +384,11 @@ export default function TransactionsPage() {
               />
             </div>
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-              <Button type="button" variant="secondary" onClick={() => { setShowModal(false); setEditingTransaction(null); resetForm(); }}>
+              <Button type="button" variant="secondary" onClick={() => { setShowModal(false); resetForm(); }}>
                 Cancel
               </Button>
               <Button type="submit">
-                {editingTransaction ? 'Update' : 'Add'} Transaction
+                Add Transaction
               </Button>
             </div>
           </form>

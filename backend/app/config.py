@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -9,7 +8,14 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     FRONTEND_URL: str = "http://localhost:3000"
-    OPENAI_API_KEY: Optional[str] = None
+    # Phase 1 foundation: free-tier safety caps (never auto-bill).
+    MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024
+    AUTH_RATE_LIMIT: int = 200  # login/register attempts per 15 min per IP (generous; E2E-safe)
+    AUTH_RATE_WINDOW_SECONDS: int = 900
+    # Commercial: bootstrap admin emails (comma-separated). Empty = no admins.
+    ADMIN_EMAILS: str = ""
+    # Password policy
+    MIN_PASSWORD_LEN: int = 8
 
     class Config:
         env_file = ".env"

@@ -1,0 +1,28 @@
+# Normalize line endings: LF in repo, native (CRLF on Windows) on checkout.
+* text=auto
+
+# Windows batch files must stay CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell/PowerShell scripts: keep LF so they also run in Docker/Linux.
+*.sh text eol=lf
+*.ps1 text eol=crlf
+
+# Explicitly treat common sources as text.
+*.py text
+*.ts text
+*.tsx text
+*.js text
+*.json text
+*.yml text
+*.yaml text
+*.md text
+*.csv text
+*.example text
+
+# Binary: never convert.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary

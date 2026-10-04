@@ -264,3 +264,87 @@ export const DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
   { value: 'expense_bill', label: 'Expense Bill' },
   { value: 'other', label: 'Other' },
 ];
+
+// ---- Phases 3-13: SaaS module types ----
+
+export interface Account {
+  id: string;
+  code: string;
+  name: string;
+  type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+  active: boolean;
+}
+
+export interface JournalLine {
+  account_code: string;
+  debit: number;
+  credit: number;
+}
+
+export interface Journal {
+  id: string;
+  date: string;
+  narration: string;
+  lines: JournalLine[];
+  status: 'posted' | 'reversed';
+  source?: Record<string, any>;
+}
+
+export interface TrialBalance {
+  rows: Array<{ code: string; name: string; type: string; debit: number; credit: number }>;
+  total_debit: number;
+  total_credit: number;
+  balanced: boolean;
+}
+
+export interface Party {
+  id: string;
+  kind: 'customer' | 'vendor';
+  name: string;
+  gstin?: string;
+  phone?: string;
+  address?: string;
+}
+
+export interface InvoiceItem {
+  desc: string;
+  hsn?: string;
+  qty: number;
+  rate: number;
+  discount_pct?: number;
+  gst_rate?: number;
+}
+
+export interface Invoice {
+  id: string;
+  kind: string;
+  number: string;
+  customer_name?: string;
+  date: string;
+  due_date: string;
+  items: InvoiceItem[];
+  taxable_value: number;
+  total_tax: number;
+  grand_total: number;
+  paid_total: number;
+  balance: number;
+  status: string;
+}
+
+export interface Product {
+  id: string;
+  sku: string;
+  name: string;
+  hsn?: string;
+  rate: number;
+  gst_rate?: number;
+  stock?: number;
+  reorder_at?: number;
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  contact?: string;
+  business?: string;
+}

@@ -8,7 +8,7 @@ from app.config import settings
 from app.database import get_database
 from app.models import User, UserInDB, TokenData, PyObjectId
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 pwd_context = bcrypt
 
 
@@ -29,6 +29,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
+
+def token_for_user(user) -> str:
+    """Issue a token bound to the user's token_version (logout-all support)."""
+    uid = str(user.id if hasattr(user, "id") else user["_id"])
+    version = int(getattr(user, "token_version", 0) or 0)
+    return create_access_token(data={"sub": user.email, "uid": uid, "v": version})
 
 
 async def get_user_by_email(email: str) -> Optional[UserInDB]:
@@ -91,6 +98,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
         raise credentials_exception
     user = await get_user_by_email(token_data.email)
     if user is None:
+        raise credentials_exception
+    # token-version binding: logout-all invalidates older tokens
+    try:
+        if int(payload.get("v", 0)) != int(getattr(user, "token_version", 0) or 0):
+            raise credentials_exception
+    except HTTPException:
+        raise
+    except Exception:
         raise credentials_exception
     return user
 

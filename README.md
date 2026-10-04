@@ -1,80 +1,76 @@
-# Tax Shield - Tax Readiness Intelligence Platform
+# TaxShield — Tax & Financial OS (Commercial SaaS)
 
-A full-stack tax readiness platform built with Next.js, FastAPI, and MongoDB.
+A full-stack tax readiness and financial operations platform: transactions,
+GST/TDS preparation, invoicing/POS, double-entry books, compliance, an
+AI-assisted (deterministic) assistant, and a complete commercial SaaS layer
+(billing, entitlements, support, admin, privacy). Next.js + FastAPI + MongoDB.
+
+> **Honesty first**: no MFA, no real payment processing, no government filing,
+> no automatic email delivery — each is either absent or clearly labelled,
+> never simulated. See `docs/FINAL_COMMERCIAL_CERTIFICATION.md`.
 
 ## Features
 
-- **Dashboard** - Tax readiness score, income breakdown, obligations, and deadlines
-- **Transactions** - Manual entry and CSV import for income, expenses, investments, and deductions
-- **Documents** - Upload and manage tax-related documents
-- **Obligations** - Rule-based detection of tax obligations with risk levels
-- **Deadlines** - Track important tax dates and filing deadlines
-- **Scenarios** - Compare alternative financial decisions and their tax impact
-- **Settings** - User profile and preferences management
+- **Dashboard** — financial health, readiness score, obligations, deadlines
+- **Money** — transactions (+CSV), banking, customers/vendors, receivables/payables
+- **Sell** — GST-aware invoices with lifecycle, POS bills, inventory
+- **Accounting** — auto-balanced journals, P&L / balance sheet / cash flow
+- **Tax** — income tax (old/new regime), AIS/Form 26AS, GST & TDS preparation
+- **Compliance** — obligations, deadlines, month-end close
+- **Assistant** — deterministic, tool-backed, EN/हिंदी/தமிழ் + Tanglish, voice I/O
+- **CA workspace** — practice view, document requests, reviews
+- **Commercial SaaS** — plans/entitlements, billing portal, trials, support
+  desk, notifications, admin console, consent + deletion, trust pages
+- **Reports & intelligence** — exports, BI, scenarios
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, React 18, TypeScript, Tailwind CSS
-- **Backend**: FastAPI, Python 3.11+
-- **Database**: MongoDB
-- **Authentication**: JWT-based auth with bcrypt password hashing
+- **Frontend**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS
+- **Backend**: FastAPI, Python 3.11+, Motor (MongoDB)
+- **Database**: MongoDB 6/7
+- **Auth**: JWT (bcrypt, token-version revocation for logout-all)
+- **Tests**: pytest (104), Playwright — Chromium 22, Firefox 11, WebKit 11
+- **Cost**: zero paid dependencies (`docs/FINAL_ZERO_COST_AUDIT.md`)
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 18+
-- Python 3.11+
-- MongoDB 6+
-
-### Using Docker (Recommended)
-
+### Docker (recommended)
 ```bash
-# Clone the repository
-cd tax-shield
-
-# Start all services
 docker-compose up -d
-
 # Frontend: http://localhost:3000
-# Backend API: http://localhost:8000
-# API Docs: http://localhost:8000/docs
+# Backend:  http://localhost:8000  (docs at /docs)
 ```
 
-### Manual Setup
-
-#### Backend
-
-```bash
+### Manual (Windows)
+```powershell
+# Backend
 cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+Copy-Item .env.example .env   # set MONGODB_URL (+ SECRET_KEY in prod)
+uvicorn app.main:app --reload --port 8000
 
-# Copy environment file
-cp .env.example .env
-
-# Edit .env with your MongoDB connection string
-# MONGODB_URL=mongodb://localhost:27017
-
-# Start the server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Frontend (new shell)
+cd frontend
+npm install
+npm run dev
 ```
+> On Windows always use `.venv\Scripts\Activate.ps1` (PowerShell) or
+> `.venv\Scripts\activate.bat` (CMD).
 
-#### Frontend
+## Tests
 
 ```bash
+# Backend (unit + API + live commercial journeys)
+py -m pytest backend/tests -q
+
+# Browser (needs stack running on :8000/:3000)
 cd frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+npx playwright test                                   # Chromium desktop+mobile
+PLAYWRIGHT_FIREFOX=1 npx playwright test --project=firefox
+PLAYWRIGHT_WEBKIT=1   npx playwright test --project=webkit
+npm run lint && npx tsc --noEmit && npm run build
 ```
 
 ## Project Structure
@@ -83,91 +79,33 @@ npm run dev
 tax-shield/
 ├── backend/
 │   ├── app/
-│   │   ├── api.py          # API routes
-│   │   ├── auth.py         # Authentication
-│   │   ├── analysis.py     # Tax analysis engine
-│   │   ├── config.py       # Configuration
-│   │   ├── database.py     # MongoDB connection
-│   │   ├── main.py         # FastAPI app
-│   │   └── models.py       # Pydantic models
-│   ├── requirements.txt
-│   └── .env.example
+│   │   ├── api.py           # core product API
+│   │   ├── saas_api.py      # invoices/POS/clients + exports
+│   │   ├── commerce.py      # plans, entitlements, providers, retention
+│   │   ├── commerce_api.py  # identity/billing/privacy/support/admin
+│   │   ├── auth.py, analysis.py, rules.py, gst.py, tds.py, ...
+│   │   └── config.py, database.py, main.py, models.py
+│   ├── scripts/backup.py    # HMAC-sealed backup + verify
+│   ├── tests/               # pytest suites (incl. live journeys)
+│   └── requirements.txt
 ├── frontend/
-│   ├── src/
-│   │   ├── app/            # Next.js App Router pages
-│   │   ├── components/     # React components
-│   │   ├── lib/            # Utilities and API client
-│   │   └── types/          # TypeScript types
-│   ├── package.json
-│   └── tailwind.config.ts
-└── docker-compose.yml
+│   ├── src/app/             # App Router pages (product + marketing)
+│   ├── src/components/      # UI, layout, assistant
+│   ├── src/lib/             # API client, auth, workspace
+│   └── tests/               # Playwright specs + helpers
+├── docs/                    # architecture, audits, runbooks, certification
+└── docker-compose[.prod].yml
 ```
 
-## Demo Mode
+## Operations
 
-The platform includes a demo mode with sample data:
-1. Register or login with any credentials
-2. Click "Load Demo Data" on the dashboard
-3. Explore pre-populated transactions, investments, deductions, and scenarios
-
-## API Documentation
-
-Once the backend is running, visit:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## Key API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login
-- `GET /api/auth/me` - Get current user
-
-### Transactions
-- `GET /api/transactions` - List transactions
-- `POST /api/transactions` - Create transaction
-- `POST /api/transactions/upload-csv` - Upload CSV
-- `DELETE /api/transactions/{id}` - Delete transaction
-
-### Investments
-- `GET /api/investments` - List investments
-- `POST /api/investments` - Create investment
-
-### Deductions
-- `GET /api/deductions` - List deductions
-- `POST /api/deductions` - Create deduction
-
-### Documents
-- `GET /api/documents` - List documents
-- `POST /api/documents` - Upload document
-
-### Obligations
-- `GET /api/obligations` - List obligations
-- `PATCH /api/obligations/{id}` - Update obligation status
-
-### Deadlines
-- `GET /api/deadlines` - List deadlines
-- `PATCH /api/deadlines/{id}` - Update deadline status
-
-### Scenarios
-- `GET /api/scenarios` - List scenarios
-- `POST /api/scenarios` - Create scenario
-- `POST /api/scenarios/compare` - Compare scenarios
-
-### Dashboard
-- `GET /api/dashboard` - Get dashboard summary
-- `GET /api/readiness-score` - Get tax readiness score
-
-## Tax Analysis Rules
-
-The analysis engine implements rules for:
-- Multiple income source detection
-- Missing document identification
-- Freelance income documentation requirements
-- Capital gains purchase documentation
-- Deduction proof verification
-- Advance tax liability estimation
+- Runbook: `docs/PRODUCTION_RUNBOOK.md`
+- Go-live gate: `docs/GO_LIVE_CHECKLIST.md`
+- Billing/privacy/support: `docs/BILLING.md`, `PRIVACY_OPERATIONS.md`,
+  `SUPPORT_OPERATIONS.md`, `SECURITY_OPERATIONS.md`, `INCIDENT_RESPONSE.md`
+- Final verdict: `docs/FINAL_COMMERCIAL_CERTIFICATION.md`
+  — **CONDITIONAL COMMERCIAL READY**
 
 ## License
 
-MIT License - feel free to use for your hackathon or project!
+MIT License.

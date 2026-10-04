@@ -434,14 +434,27 @@ class TaxAnalysisEngine:
         return base - rebate + surcharge + cess
 
     def compute_tax_detailed(self, taxable_income: float, regime: str = "old") -> dict:
-        """Deterministic slab tax + 87A rebate + surcharge + 4% cess. No AI, no external calls."""
+        """Deterministic slab tax + 87A rebate + surcharge + 4% cess. No AI, no external calls.
+
+        Slab parameters resolve through the versioned rule registry
+        (app/rules.py) with exact fallback to the legacy hardcoded tables,
+        so versioning never changes live results until a version is activated.
+        """
         t = max(0, taxable_income)
-        if regime == "new":
-            slabs = [(300000, 0.0), (600000, 0.05), (900000, 0.10), (1200000, 0.15), (1500000, 0.20), (float("inf"), 0.30)]
-            rebate_limit, rebate_max = 700000, 25000
-        else:
-            slabs = [(250000, 0.0), (500000, 0.05), (750000, 0.10), (1000000, 0.15), (1250000, 0.20), (1500000, 0.25), (float("inf"), 0.30)]
-            rebate_limit, rebate_max = 500000, 12500
+        try:
+            from app.rules import registry as _registry
+
+            reg = _registry.slab_params(regime if regime in ("old", "new") else "old")
+            slabs = [(float(lim) if lim != "inf" else float("inf"), float(rate))
+                     for lim, rate in reg["slabs"]]
+            rebate_limit, rebate_max = float(reg["rebate_limit"]), float(reg["rebate_max"])
+        except Exception:
+            if regime == "new":
+                slabs = [(300000, 0.0), (600000, 0.05), (900000, 0.10), (1200000, 0.15), (1500000, 0.20), (float("inf"), 0.30)]
+                rebate_limit, rebate_max = 700000, 25000
+            else:
+                slabs = [(250000, 0.0), (500000, 0.05), (750000, 0.10), (1000000, 0.15), (1250000, 0.20), (1500000, 0.25), (float("inf"), 0.30)]
+                rebate_limit, rebate_max = 500000, 12500
         base = 0.0
         prev = 0.0
         for limit, rate in slabs:

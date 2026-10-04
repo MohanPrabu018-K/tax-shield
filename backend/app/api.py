@@ -18,22 +18,58 @@ from app.models import (
     Form26ASRecord, Form26ASRecordCreate,
 )
 from app.analysis import analysis_engine
+from pathlib import Path
+from typing import Optional as _Optional
+
+from app.pagination import paginate
+from app.validation import parse_object_id, check_upload, check_non_negative, MAX_CSV_ROWS
+from app.audit import log_event
+from app import feature_flags
+from app.tax_periods import normalize_regime
 
 router = APIRouter()
 
+# ---- generous in-memory auth rate limit (per IP; E2E-safe ceiling) ----
+import time as _time
+
+from app.config import settings as _settings
+
+_auth_hits: dict[str, list] = {}
+
+
+def _auth_rate_ok(key: str) -> bool:
+    now = _time.time()
+    window = _settings.AUTH_RATE_WINDOW_SECONDS
+    arr = _auth_hits.setdefault(key, [])
+    while arr and arr[0] < now - window:
+        arr.pop(0)
+    if len(arr) >= _settings.AUTH_RATE_LIMIT:
+        return False
+    arr.append(now)
+    return True
+
+# Windows-safe: store uploads under <backend>/uploads regardless of the
+# current working directory (PowerShell vs CMD vs Docker all differ).
+_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
+_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 
 @router.post("/register", response_model=Token)
-async def register(user_data: UserCreate):
+async def register(user_data: UserCreate, request: Request):
+    if not _auth_rate_ok("register:" + (request.client.host if request.client else "na")):
+        raise HTTPException(status_code=429, detail="Too many attempts. Please try again later.")
     database = await get_database()
     existing = await database.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     user_dict = user_data.model_dump()
-    from app.auth import create_user
+    from app.auth import create_user, token_for_user
     user = await create_user(user_dict)
-    
-    access_token = create_access_token(data={"sub": user.email})
+
+    access_token = token_for_user(user)
+    await log_event("REGISTER", user_id=user.id,
+                    request_id=getattr(getattr(request, "state", None), "request_id", None))
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -72,12 +108,17 @@ async def login(request: Request):
     if not email or not password:
         raise HTTPException(status_code=400, detail="Invalid login credentials")
 
-    from app.auth import authenticate_user
+    if not _auth_rate_ok("login:" + (request.client.host if request.client else "na")):
+        raise HTTPException(status_code=429, detail="Too many attempts. Please try again later.")
+
+    from app.auth import authenticate_user, token_for_user
     user = await authenticate_user(email, password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    access_token = create_access_token(data={"sub": user.email})
+
+    access_token = token_for_user(user)
+    await log_event("LOGIN", user_id=user.id,
+                    request_id=getattr(getattr(request, "state", None), "request_id", None))
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -95,6 +136,9 @@ async def create_transaction(
     if transaction.amount < 0:
         raise HTTPException(status_code=422, detail="amount must be non-negative")
     database = await get_database()
+    from app.commerce import check_limit as _check_limit
+
+    await _check_limit(database, current_user.id, "transactions")
     transaction_dict = transaction.model_dump()
     transaction_dict["user_id"] = current_user.id
     transaction_dict["created_at"] = datetime.utcnow()
@@ -102,6 +146,14 @@ async def create_transaction(
 
     result = await database.transactions.insert_one(transaction_dict)
     transaction_dict["_id"] = result.inserted_id
+
+    # Phase 3+: accounting leg (best-effort; never breaks the transaction).
+    try:
+        from app.saas_api import auto_post_transaction
+
+        await auto_post_transaction(database, current_user, transaction_dict)
+    except Exception:
+        pass
 
     if request.query_params.get("analyze", "true").lower() not in ("false", "0", "no"):
         await analysis_engine.analyze_user_data(current_user.id)
@@ -125,16 +177,25 @@ async def bulk_create_transactions(
         d["updated_at"] = datetime.utcnow()
         docs.append(d)
     if docs:
+        from app.commerce import entitlement as _entitlement
+
+        ent = await _entitlement(database, current_user.id)
+        limit = ent["limits"].get("transactions")
+        if limit is not None and ent["usage"].get("transactions", 0) + len(docs) > limit:
+            raise HTTPException(status_code=403, detail={
+                "error": "plan_limit_reached", "limit": "transactions",
+                "message": "This import would exceed your plan's transaction limit."})
         await database.transactions.insert_many(docs)
         await analysis_engine.analyze_user_data(current_user.id)
     return {"inserted": len(docs)}
 
 
 @router.get("/transactions", response_model=List[Transaction])
-async def get_transactions(current_user: User = Depends(get_current_active_user)):
+async def get_transactions(current_user: User = Depends(get_current_active_user),
+                           skip: _Optional[int] = None, limit: _Optional[int] = None):
     database = await get_database()
     transactions = await database.transactions.find({"user_id": current_user.id}).sort("date", -1).to_list(None)
-    return [Transaction(**t) for t in transactions]
+    return [Transaction(**t) for t in paginate(transactions, skip, limit)]
 
 
 @router.post("/transactions/upload-csv")
@@ -144,11 +205,18 @@ async def upload_transactions_csv(
 ):
     database = await get_database()
     content = await file.read()
-    decoded = content.decode("utf-8")
+    check_upload(file.filename, file.content_type, len(content))
+    try:
+        decoded = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="CSV must be UTF-8 encoded")
     reader = csv.DictReader(io.StringIO(decoded))
-    
+
     transactions_created = 0
+    skipped = 0
     for row in reader:
+        if transactions_created + skipped >= MAX_CSV_ROWS:
+            break
         try:
             transaction_data = {
                 "date": datetime.fromisoformat(row.get("date", "").replace("Z", "+00:00")),
@@ -167,35 +235,45 @@ async def upload_transactions_csv(
             await database.transactions.insert_one(transaction_data)
             transactions_created += 1
         except Exception:
+            skipped += 1
             continue
-    
+
     await analysis_engine.analyze_user_data(current_user.id)
-    
-    return {"message": f"Successfully uploaded {transactions_created} transactions"}
+
+    return {"message": f"Successfully uploaded {transactions_created} transactions",
+            "imported": transactions_created, "skipped": skipped}
 
 
 @router.delete("/transactions/{transaction_id}")
 async def delete_transaction(
     transaction_id: str,
+    request: Request,
     current_user: User = Depends(get_current_active_user)
 ):
     database = await get_database()
+    oid = parse_object_id(transaction_id, "transaction")
     result = await database.transactions.delete_one({
-        "_id": ObjectId(transaction_id),
+        "_id": oid,
         "user_id": current_user.id
     })
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    
+
     await analysis_engine.analyze_user_data(current_user.id)
+    await log_event("TRANSACTION_DELETED", user_id=current_user.id, obj=transaction_id,
+                    request_id=getattr(getattr(request, "state", None), "request_id", None))
     return {"message": "Transaction deleted"}
 
 
 @router.post("/investments", response_model=Investment)
 async def create_investment(
     investment: InvestmentCreate,
+    request: Request,
     current_user: User = Depends(get_current_active_user)
 ):
+    check_non_negative(investment.purchase_value, "purchase_value")
+    check_non_negative(investment.sale_value, "sale_value")
+    check_non_negative(investment.amount, "amount")
     database = await get_database()
     investment_dict = investment.model_dump()
     investment_dict["user_id"] = current_user.id
@@ -213,17 +291,20 @@ async def create_investment(
 
 
 @router.get("/investments", response_model=List[Investment])
-async def get_investments(current_user: User = Depends(get_current_active_user)):
+async def get_investments(current_user: User = Depends(get_current_active_user),
+                          skip: _Optional[int] = None, limit: _Optional[int] = None):
     database = await get_database()
     investments = await database.investments.find({"user_id": current_user.id}).to_list(None)
-    return [Investment(**i) for i in investments]
+    return [Investment(**i) for i in paginate(investments, skip, limit)]
 
 
 @router.post("/deductions", response_model=Deduction)
 async def create_deduction(
     deduction: DeductionCreate,
+    request: Request,
     current_user: User = Depends(get_current_active_user)
 ):
+    check_non_negative(deduction.amount, "amount")
     database = await get_database()
     deduction_dict = deduction.model_dump()
     deduction_dict["user_id"] = current_user.id
@@ -238,10 +319,11 @@ async def create_deduction(
 
 
 @router.get("/deductions", response_model=List[Deduction])
-async def get_deductions(current_user: User = Depends(get_current_active_user)):
+async def get_deductions(current_user: User = Depends(get_current_active_user),
+                         skip: _Optional[int] = None, limit: _Optional[int] = None):
     database = await get_database()
     deductions = await database.deductions.find({"user_id": current_user.id}).to_list(None)
-    return [Deduction(**d) for d in deductions]
+    return [Deduction(**d) for d in paginate(deductions, skip, limit)]
 
 
 @router.post("/documents", response_model=Document)
@@ -256,11 +338,18 @@ async def upload_document(
 ):
     database = await get_database()
     content = await file.read()
-    
-    import os
-    upload_dir = "uploads"
-    os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, f"{current_user.id}_{file.filename}")
+    from app.config import settings as _cfg
+    from app.commerce import check_limit as _check_docs
+
+    await _check_docs(database, current_user.id, "documents")
+    check_upload(file.filename, file.content_type, len(content))
+
+    # Sanitize filename for Windows (no < > : " / \ | ? * or reserved names).
+    safe_name = Path(file.filename or "upload").name
+    for ch in '<>:"/\\|?*':
+        safe_name = safe_name.replace(ch, "_")
+    safe_name = safe_name.strip() or "upload"
+    file_path = str(_UPLOAD_DIR / f"{current_user.id}_{safe_name}")
     
     with open(file_path, "wb") as f:
         f.write(content)
@@ -270,9 +359,9 @@ async def upload_document(
         "document_type": document_type,
         "financial_year": financial_year,
         "verification_status": VerificationStatus.COMPLETE,
-        "related_transaction_id": ObjectId(related_transaction_id) if related_transaction_id else None,
-        "related_investment_id": ObjectId(related_investment_id) if related_investment_id else None,
-        "related_deduction_id": ObjectId(related_deduction_id) if related_deduction_id else None,
+        "related_transaction_id": parse_object_id(related_transaction_id, "transaction") if related_transaction_id else None,
+        "related_investment_id": parse_object_id(related_investment_id, "investment") if related_investment_id else None,
+        "related_deduction_id": parse_object_id(related_deduction_id, "deduction") if related_deduction_id else None,
         "user_id": current_user.id,
         "file_path": file_path,
         "file_size": len(content),
@@ -282,10 +371,12 @@ async def upload_document(
     
     result = await database.documents.insert_one(document_dict)
     document_dict["_id"] = result.inserted_id
-    
+
     if related_transaction_id:
+        # Tenant fix: only link caller-owned transactions.
         await database.transactions.update_one(
-            {"_id": ObjectId(related_transaction_id)},
+            {"_id": parse_object_id(related_transaction_id, "transaction"),
+             "user_id": current_user.id},
             {"$set": {"document_id": result.inserted_id}}
         )
     
@@ -294,10 +385,11 @@ async def upload_document(
 
 
 @router.get("/documents", response_model=List[Document])
-async def get_documents(current_user: User = Depends(get_current_active_user)):
+async def get_documents(current_user: User = Depends(get_current_active_user),
+                        skip: _Optional[int] = None, limit: _Optional[int] = None):
     database = await get_database()
     documents = await database.documents.find({"user_id": current_user.id}).to_list(None)
-    return [Document(**d) for d in documents]
+    return [Document(**d) for d in paginate(documents, skip, limit)]
 
 
 @router.get("/documents/{document_id}/download")
@@ -312,9 +404,12 @@ async def download_document(
         doc = await database.documents.find_one({"_id": ObjectId(document_id), "user_id": current_user.id})
     except Exception:
         doc = None
-    if not doc or not doc.get("file_path") or not os.path.isfile(doc["file_path"]):
+    stored = (doc or {}).get("file_path")
+    # Backward compat: older records stored a CWD-relative "uploads/..." path.
+    candidate = Path(stored) if stored and Path(stored).is_absolute() else (_UPLOAD_DIR / Path(stored or "").name if stored else None)
+    if not doc or not stored or not (candidate and candidate.is_file()):
         raise HTTPException(status_code=404, detail="Document file not found")
-    return FileResponse(doc["file_path"], filename=doc.get("file_name") or "document",
+    return FileResponse(str(candidate), filename=doc.get("file_name") or "document",
                         media_type=doc.get("mime_type") or "application/octet-stream")
 
 
@@ -333,8 +428,10 @@ async def delete_document(
         raise HTTPException(status_code=404, detail="Document not found")
     await database.documents.delete_one({"_id": doc["_id"]})
     try:
-        if doc.get("file_path") and os.path.isfile(doc["file_path"]):
-            os.remove(doc["file_path"])
+        stored = doc.get("file_path")
+        candidate = Path(stored) if stored and Path(stored).is_absolute() else (_UPLOAD_DIR / Path(stored or "").name if stored else None)
+        if candidate and candidate.is_file():
+            candidate.unlink()
     except Exception:
         pass
     await analysis_engine.analyze_user_data(current_user.id)
@@ -342,10 +439,11 @@ async def delete_document(
 
 
 @router.get("/obligations", response_model=List[Obligation])
-async def get_obligations(current_user: User = Depends(get_current_active_user)):
+async def get_obligations(current_user: User = Depends(get_current_active_user),
+                          skip: _Optional[int] = None, limit: _Optional[int] = None):
     database = await get_database()
     obligations = await database.obligations.find({"user_id": current_user.id}).to_list(None)
-    return [Obligation(**o) for o in obligations]
+    return [Obligation(**o) for o in paginate(obligations, skip, limit)]
 
 
 @router.patch("/obligations/{obligation_id}")
@@ -360,26 +458,37 @@ async def update_obligation_status(
         try:
             body = await request.json()
             if isinstance(body, dict) and body.get("status"):
-                status = ObligationStatus(body["status"])
+                try:
+                    status = ObligationStatus(body["status"])
+                except ValueError:
+                    raise HTTPException(status_code=422, detail="Invalid status value")
+        except HTTPException:
+            raise
         except Exception:
             pass
     if status is None:
         raise HTTPException(status_code=422, detail="status is required")
     database = await get_database()
+    oid = parse_object_id(obligation_id, "obligation")
+    existing = await database.obligations.find_one({"_id": oid, "user_id": current_user.id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Obligation not found")
     result = await database.obligations.update_one(
-        {"_id": ObjectId(obligation_id), "user_id": current_user.id},
+        {"_id": oid, "user_id": current_user.id},
         {"$set": {"status": status, "updated_at": datetime.utcnow()}}
     )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Obligation not found")
+    await log_event("OBLIGATION_UPDATED", user_id=current_user.id, obj=obligation_id,
+                    meta={"status": str(status)},
+                    request_id=getattr(getattr(request, "state", None), "request_id", None))
     return {"message": "Obligation updated"}
 
 
 @router.get("/deadlines", response_model=List[Deadline])
-async def get_deadlines(current_user: User = Depends(get_current_active_user)):
+async def get_deadlines(current_user: User = Depends(get_current_active_user),
+                        skip: _Optional[int] = None, limit: _Optional[int] = None):
     database = await get_database()
     deadlines = await database.deadlines.find({"user_id": current_user.id}).sort("due_date", 1).to_list(None)
-    return [Deadline(**d) for d in deadlines]
+    return [Deadline(**d) for d in paginate(deadlines, skip, limit)]
 
 
 @router.patch("/deadlines/{deadline_id}")
@@ -403,13 +512,15 @@ async def update_deadline_status(
     update_data = {"is_completed": is_completed}
     if is_completed:
         update_data["completed_at"] = datetime.utcnow()
-    
-    result = await database.deadlines.update_one(
-        {"_id": ObjectId(deadline_id), "user_id": current_user.id},
+
+    oid = parse_object_id(deadline_id, "deadline")
+    existing = await database.deadlines.find_one({"_id": oid, "user_id": current_user.id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Deadline not found")
+    await database.deadlines.update_one(
+        {"_id": oid, "user_id": current_user.id},
         {"$set": update_data}
     )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Deadline not found")
     return {"message": "Deadline updated"}
 
 
@@ -436,10 +547,11 @@ async def create_scenario(
 
 
 @router.get("/scenarios", response_model=List[Scenario])
-async def get_scenarios(current_user: User = Depends(get_current_active_user)):
+async def get_scenarios(current_user: User = Depends(get_current_active_user),
+                        skip: _Optional[int] = None, limit: _Optional[int] = None):
     database = await get_database()
     scenarios = await database.scenarios.find({"user_id": current_user.id}).sort("created_at", -1).to_list(None)
-    return [Scenario(**s) for s in scenarios]
+    return [Scenario(**s) for s in paginate(scenarios, skip, limit)]
 
 
 @router.post("/scenarios/compare")
@@ -462,7 +574,11 @@ async def compare_scenarios(
     database = await get_database()
     scenarios = []
     for sid in scenario_ids:
-        scenario = await database.scenarios.find_one({"_id": ObjectId(sid), "user_id": current_user.id})
+        try:
+            oid = parse_object_id(sid, "scenario")
+        except HTTPException:
+            continue
+        scenario = await database.scenarios.find_one({"_id": oid, "user_id": current_user.id})
         if scenario:
             scenarios.append(Scenario(**scenario))
     
@@ -503,10 +619,11 @@ async def create_tax_payment(payment: TaxPaymentCreate, current_user: User = Dep
 
 
 @router.get("/tax-payments", response_model=List[TaxPayment])
-async def list_tax_payments(current_user: User = Depends(get_current_active_user)):
+async def list_tax_payments(current_user: User = Depends(get_current_active_user),
+                            skip: _Optional[int] = None, limit: _Optional[int] = None):
     database = await get_database()
     payments = await database.tax_payments.find({"user_id": current_user.id}).sort("payment_date", -1).to_list(None)
-    return [TaxPayment(**p) for p in payments]
+    return [TaxPayment(**p) for p in paginate(payments, skip, limit)]
 
 
 @router.post("/ais-records", response_model=AISRecord)
@@ -522,10 +639,11 @@ async def create_ais_record(record: AISRecordCreate, current_user: User = Depend
 
 
 @router.get("/ais-records", response_model=List[AISRecord])
-async def list_ais_records(current_user: User = Depends(get_current_active_user)):
+async def list_ais_records(current_user: User = Depends(get_current_active_user),
+                           skip: _Optional[int] = None, limit: _Optional[int] = None):
     database = await get_database()
     records = await database.ais_records.find({"user_id": current_user.id}).to_list(None)
-    return [AISRecord(**r) for r in records]
+    return [AISRecord(**r) for r in paginate(records, skip, limit)]
 
 
 @router.post("/form26as-records", response_model=Form26ASRecord)
@@ -541,10 +659,11 @@ async def create_form26as_record(record: Form26ASRecordCreate, current_user: Use
 
 
 @router.get("/form26as-records", response_model=List[Form26ASRecord])
-async def list_form26as_records(current_user: User = Depends(get_current_active_user)):
+async def list_form26as_records(current_user: User = Depends(get_current_active_user),
+                                skip: _Optional[int] = None, limit: _Optional[int] = None):
     database = await get_database()
     records = await database.form26as_records.find({"user_id": current_user.id}).to_list(None)
-    return [Form26ASRecord(**r) for r in records]
+    return [Form26ASRecord(**r) for r in paginate(records, skip, limit)]
 
 
 @router.get("/reconciliation")
@@ -594,7 +713,7 @@ async def get_readiness_score(current_user: User = Depends(get_current_active_us
 
 
 @router.get("/demo/seed")
-async def seed_demo_data(current_user: User = Depends(get_current_active_user)):
+async def seed_demo_data(request: Request, current_user: User = Depends(get_current_active_user)):
     database = await get_database()
     
     await database.transactions.delete_many({"user_id": current_user.id})
@@ -644,10 +763,49 @@ async def seed_demo_data(current_user: User = Depends(get_current_active_user)):
         {"name": "Scenario B: Sell MF Now", "description": "Realize capital gains this year", "assumptions": {"regime": "new", "realize_gains": True}, "estimated_income": 875000, "estimated_deductions": 150000, "estimated_liability": 52000, "risk_level": RiskLevel.MEDIUM, "required_documents": ["MF purchase statement", "MF sale statement"], "is_current": False, "user_id": current_user.id, "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()},
     ]
     await database.scenarios.insert_many(demo_scenarios)
-    
+
     await analysis_engine.analyze_user_data(current_user.id)
-    
+
+    await log_event("DEMO_SEEDED", user_id=current_user.id,
+                    request_id=getattr(getattr(request, "state", None), "request_id", None))
     return {"message": "Demo data seeded successfully"}
+
+
+@router.post("/demo/seed")
+async def seed_demo_data_post(request: Request,
+                               current_user: User = Depends(get_current_active_user)):
+    """Canonical non-destructive-verb alias (GET kept for backward compat)."""
+    return await seed_demo_data(request, current_user)
+
+
+# ---------------- Foundation: rule registry + feature flags (read-only) ----------------
+
+@router.get("/rules/versions")
+async def list_rule_versions(current_user: User = Depends(get_current_active_user)):
+    from app.rules import registry
+    return {"active_version": registry.active()["version"],
+            "versions": [{"version": v["version"], "domain": v["domain"],
+                          "status": v["validation_status"], "tax_periods": v["tax_periods"],
+                          "checksum": v["checksum"]} for v in registry.versions()]}
+
+
+@router.get("/rules/active")
+async def get_active_rule(current_user: User = Depends(get_current_active_user)):
+    from app.rules import registry
+    return registry.active()
+
+
+@router.get("/rules/tax-periods")
+async def list_tax_periods(current_user: User = Depends(get_current_active_user)):
+    from app.tax_periods import current_fy, ay_from_fy
+    fy = current_fy()
+    return {"current_financial_year": fy, "current_assessment_year": ay_from_fy(fy),
+            "supported_regimes": ["old", "new"]}
+
+
+@router.get("/features")
+async def list_features(current_user: User = Depends(get_current_active_user)):
+    return {"flags": feature_flags.all_flags()}
 
 # ---------------- TaxShield Intelligent Assistant ----------------
 _chat_hits: dict = {}

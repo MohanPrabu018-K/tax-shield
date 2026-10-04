@@ -87,6 +87,12 @@ class User(UserBase):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     is_active: bool = True
+    # Commercial identity: JWT version binding (logout-all) + admin console.
+    token_version: int = 0
+    is_admin: bool = False
+    deletion_status: Optional[str] = None
+    deletion_requested_at: Optional[datetime] = None
+    deletion_grace_until: Optional[datetime] = None
 
     class Config:
         populate_by_name = True

@@ -13,7 +13,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { formatDate, formatCurrency, getVerificationStatusColor, cn } from '@/lib/utils';
-import { Upload, FileText, Eye, Download, Trash2 } from 'lucide-react';
+import { Upload, FileText, Eye, Download, Trash2, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function DocumentsPage() {
@@ -127,11 +127,28 @@ export default function DocumentsPage() {
     }
   };
 
-  const verificationColors = {
-    complete: 'bg-green-100 text-green-800',
-    missing: 'bg-red-100 text-red-800',
-    partial: 'bg-yellow-100 text-yellow-800',
-    needs_review: 'bg-blue-100 text-blue-800',
+  const handleVerify = async (doc: Document) => {
+    const id = (doc as any).id ?? (doc as any)._id;
+    if (!id) return;
+    try {
+      await api.verifyDocument(id, 'verified', 'Verified in Document Center');
+      toast.success('Document verified');
+      fetchDocuments();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Verification failed');
+    }
+  };
+
+  const verificationVariant = (s: string) =>
+    s === 'complete' || s === 'verified' ? 'success'
+    : s === 'missing' ? 'danger'
+    : s === 'needs_review' ? 'medium' : 'default';
+
+  const formatSize = (bytes: number) => {
+    if (!bytes) return '—';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   };
 
   return (
@@ -193,12 +210,12 @@ export default function DocumentsPage() {
                         <TableCell className="capitalize">{doc.document_type.replace(/_/g, ' ')}</TableCell>
                         <TableCell>{doc.financial_year}</TableCell>
                         <TableCell>
-                          <Badge variant={verificationColors[doc.verification_status] as any}>
+                          <Badge variant={verificationVariant(doc.verification_status)}>
                             {doc.verification_status.replace('_', ' ')}
                           </Badge>
                         </TableCell>
                         <TableCell>{formatDate(doc.upload_date)}</TableCell>
-                        <TableCell>{formatCurrency(doc.file_size / 1024)} KB</TableCell>
+                        <TableCell>{formatSize(doc.file_size)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Button variant="ghost" size="sm" onClick={() => handleView(doc)} aria-label="View document">
@@ -207,6 +224,11 @@ export default function DocumentsPage() {
                             <Button variant="ghost" size="sm" onClick={() => handleDownload(doc)} aria-label="Download document">
                               <Download className="h-4 w-4" />
                             </Button>
+                            {doc.verification_status !== 'complete' && (
+                              <Button variant="ghost" size="sm" onClick={() => handleVerify(doc)} aria-label="Verify document">
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="sm" onClick={() => handleDelete(doc)} aria-label="Delete document">
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>

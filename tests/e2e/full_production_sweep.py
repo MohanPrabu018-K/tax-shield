@@ -1,5 +1,6 @@
-import requests, time, sys
-B="http://localhost:8000/api"; F="http://localhost:3000"
+import requests, time, sys, os
+B = os.environ.get("TAXSHIELD_API_URL", "http://localhost:8000/api")
+F = os.environ.get("TAXSHIELD_FRONTEND_URL", "http://localhost:3000")
 P=[]; F_= []
 def ck(c,m):
     (P if c else F_).append(m); print(("PASS " if c else "FAIL ")+m)

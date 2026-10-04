@@ -1,33 +1,207 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/lib/auth';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { api } from '@/lib/api';
+import { getWorkspace, clearWorkspace } from '@/lib/workspace';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Badge } from '@/components/ui/Badge';
-import { User, Shield, Bell, Palette, Database, LogOut } from 'lucide-react';
+import { PageLoading } from '@/components/ui/State';
+import { User, Shield, Bell, Database, LogOut, Download } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-export default function SettingsPage() {
-  const { user, logout, refreshUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security' | 'data'>('profile');
-  const [profileData, setProfileData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    age: user?.age?.toString() || '',
-    tax_jurisdiction: user?.tax_jurisdiction || 'India',
-    financial_year: user?.financial_year || '2024-25',
-    employment_type: user?.employment_type || '',
-    preferred_tax_regime: user?.preferred_tax_regime || '',
-    risk_preference: user?.risk_preference || 'moderate',
-  });
+function PasswordForm() {
+  const [oldPw, setOldPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const change = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const r = await api.changePassword(oldPw, newPw);
+      toast.success(r.message || 'Password changed');
+      setOldPw('');
+      setNewPw('');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.response?.data?.detail || 'Change failed');
+    }
+  };
+  return (
+    <form onSubmit={change} className="flex flex-col sm:flex-row gap-2 max-w-xl">
+      <Input type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} placeholder="Current password" aria-label="Current password" required />
+      <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password (8+ chars)" aria-label="New password" required minLength={8} />
+      <Button type="submit">Change</Button>
+    </form>
+  );
+}
 
-  const handleSaveProfile = async () => {
-    toast.success('Profile saved (demo mode)');
+function SessionsPanel() {
+  const { logout } = useAuth();
+  const router = useRouter();
+  const [sessions, setSessions] = useState<any[]>([]);
+  useEffect(() => {
+    api.getSessions().then((r) => setSessions(r.sessions || [])).catch(() => undefined);
+  }, []);
+  const logoutAllDevices = async () => {
+    try {
+      const r = await api.logoutAll();
+      if (r.access_token) api.setToken(r.access_token);
+      toast.success('All other sessions signed out');
+    } catch {
+      toast.error('Failed');
+    }
+  };
+  const logoutThis = () => {
+    logout();
+    router.push('/login');
+  };
+  return (
+    <div>
+      <p className="text-sm text-gray-500 mb-2">Recent sign-ins (JWT sessions are stateless — each sign-in is listed):</p>
+      <ul className="text-sm space-y-1 mb-3">
+        {sessions.slice(0, 10).map((s: any, i: number) => (
+          <li key={i} className="text-gray-600">{s.action} · {String(s.at).slice(0, 16).replace('T', ' ')}</li>
+        ))}
+        {sessions.length === 0 && <li className="text-gray-400">No sessions recorded yet.</li>}
+      </ul>
+      <div className="flex gap-2">
+        <Button variant="secondary" onClick={logoutAllDevices}>Sign out all other devices</Button>
+        <Button variant="secondary" onClick={logoutThis}>
+          <LogOut className="h-4 w-4 mr-2" /> Sign out this device
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ConsentsPanel() {
+  const purposes = ['essential', 'communications', 'ai_processing', 'analytics', 'marketing'];
+  const [consents, setConsents] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    api.getConsents().then((r) => setConsents(r.consents || {})).catch(() => undefined);
+  }, []);
+  const set = async (purpose: string, granted: boolean) => {
+    try {
+      await api.setConsent(purpose, granted);
+      setConsents((c) => ({ ...c, [purpose]: granted }));
+      toast.success('Consent recorded with history');
+    } catch {
+      toast.error('Failed');
+    }
+  };
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-gray-500">Purpose-specific consent, withdrawable anytime. Essential processing is required for the service; the rest are optional.</p>
+      {purposes.map((p) => (
+        <label key={p} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg text-sm">
+          <span className="capitalize font-medium">{p.replace(/_/g, ' ')}{p === 'essential' && ' (required)'}</span>
+          <input type="checkbox" checked={!!consents[p]} disabled={p === 'essential'}
+            onChange={(e) => set(p, e.target.checked)} className="h-5 w-5"
+            aria-label={`Consent for ${p}`} />
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function DeletionPanel() {
+  const { logout } = useAuth();
+  const router = useRouter();
+  const [status, setStatus] = useState<any>(null);
+  const [confirm, setConfirm] = useState('');
+  useEffect(() => {
+    api.deletionStatus().then(setStatus).catch(() => undefined);
+  }, []);
+  const request = async () => {
+    try {
+      const r = await api.requestDeletion();
+      toast.success('Deletion requested — 7-day grace');
+      setStatus({ status: 'pending', grace_until: r.grace_until });
+    } catch {
+      toast.error('Request failed');
+    }
+  };
+  const execute = async () => {
+    try {
+      await api.executeDeletion(confirm, true);
+      toast.success('Account deleted');
+      logout();
+      router.push('/');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.response?.data?.detail || 'Execute failed');
+    }
+  };
+  return (
+    <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-sm space-y-3">
+      <p className="text-red-800">Deletion purges your transactions, invoices, documents (files included), clients and workspace data. Security audit events and billing records are retained as required — shown to you before you confirm.</p>
+      {!status?.status ? (
+        <Button variant="danger" onClick={request}>Request deletion (7-day grace)</Button>
+      ) : (
+        <>
+          <p className="text-red-800">Status: <strong>{status.status}</strong>{status.grace_until ? ` · grace until ${String(status.grace_until).slice(0, 10)}` : ''}</p>
+          <div className="flex gap-2">
+            <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder='Type DELETE to confirm' aria-label="Deletion confirmation" />
+            <Button variant="danger" onClick={execute}>Delete now</Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+
+export default function SettingsPage() {
+  const { user, logout, loading } = useAuth();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security' | 'data'>('profile');
+  const [aiPref, setAiPref] = useState('enabled');
+  const [inAppAlerts, setInAppAlerts] = useState(true);
+
+  useEffect(() => {
+    try {
+      setAiPref(localStorage.getItem('taxshield_ai') || 'enabled');
+      setInAppAlerts(localStorage.getItem('taxshield_alerts') !== 'off');
+    } catch { /* ignore */ }
+  }, []);
+
+  const savePrefs = () => {
+    try {
+      localStorage.setItem('taxshield_ai', aiPref);
+      localStorage.setItem('taxshield_alerts', inAppAlerts ? 'on' : 'off');
+      toast.success('Preferences saved on this device');
+    } catch {
+      toast.error('Could not save preferences');
+    }
+  };
+
+  const downloadAuthed = async (path: string, filename: string) => {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        headers: { Authorization: `Bearer ${api.getToken()}` },
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${filename}`);
+    } catch {
+      toast.error('Export failed');
+    }
+  };
+
+  const logoutAll = () => {
+    api.clearToken();
+    try { localStorage.removeItem('token'); } catch { /* ignore */ }
+    logout();
+    router.push('/login');
+    toast.success('Signed out on this device');
   };
 
   const tabs = [
@@ -36,6 +210,8 @@ export default function SettingsPage() {
     { id: 'security', label: 'Security', icon: Bell },
     { id: 'data', label: 'Data Management', icon: Database },
   ];
+
+  const ws = getWorkspace();
 
   return (
     <DashboardLayout>
@@ -74,215 +250,117 @@ export default function SettingsPage() {
             <div className="p-6">
               {activeTab === 'profile' && (
                 <div id="profile-panel" role="tabpanel" aria-labelledby="profile-tab" className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="h-20 w-20 rounded-full bg-primary-100 flex items-center justify-center">
-                      <User className="h-10 w-10 text-primary-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{profileData.name || 'User'}</h3>
-                      <p className="text-gray-500">{profileData.email}</p>
-                      <p className="text-sm text-gray-400">Member since {user?.created_at ? formatDate(user.created_at) : 'Unknown'}</p>
-                    </div>
-                  </div>
-                  <div className="border-t border-gray-100 pt-6 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Input
-                        label="Full Name"
-                        value={profileData.name}
-                        onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                      />
-                      <Input
-                        label="Email"
-                        type="email"
-                        value={profileData.email}
-                        onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                        disabled
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Input
-                        label="Age"
-                        type="number"
-                        value={profileData.age}
-                        onChange={(e) => setProfileData({ ...profileData, age: e.target.value })}
-                        min="18"
-                        max="100"
-                      />
-                      <Select
-                        label="Tax Jurisdiction"
-                        value={profileData.tax_jurisdiction}
-                        onChange={(e) => setProfileData({ ...profileData, tax_jurisdiction: e.target.value })}
-                        options={[
-                          { value: 'India', label: 'India' },
-                          { value: 'US', label: 'United States' },
-                          { value: 'UK', label: 'United Kingdom' },
-                        ]}
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Select
-                        label="Financial Year"
-                        value={profileData.financial_year}
-                        onChange={(e) => setProfileData({ ...profileData, financial_year: e.target.value })}
-                        options={[
-                          { value: '2024-25', label: '2024-25' },
-                          { value: '2023-24', label: '2023-24' },
-                          { value: '2022-23', label: '2022-23' },
-                        ]}
-                      />
-                      <Select
-                        label="Employment Type"
-                        value={profileData.employment_type}
-                        onChange={(e) => setProfileData({ ...profileData, employment_type: e.target.value })}
-                        options={[
-                          { value: 'salaried', label: 'Salaried Employee' },
-                          { value: 'freelancer', label: 'Freelancer/Gig Worker' },
-                          { value: 'business_owner', label: 'Business Owner' },
-                          { value: 'investor', label: 'Investor' },
-                          { value: 'landlord', label: 'Landlord' },
-                          { value: 'other', label: 'Other' },
-                        ]}
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Select
-                        label="Preferred Tax Regime"
-                        value={profileData.preferred_tax_regime}
-                        onChange={(e) => setProfileData({ ...profileData, preferred_tax_regime: e.target.value })}
-                        options={[
-                          { value: '', label: 'Not specified' },
-                          { value: 'old', label: 'Old Regime' },
-                          { value: 'new', label: 'New Regime' },
-                        ]}
-                      />
-                      <Select
-                        label="Risk Preference"
-                        value={profileData.risk_preference}
-                        onChange={(e) => setProfileData({ ...profileData, risk_preference: e.target.value })}
-                        options={[
-                          { value: 'conservative', label: 'Conservative' },
-                          { value: 'moderate', label: 'Moderate' },
-                          { value: 'aggressive', label: 'Aggressive' },
-                        ]}
-                      />
-                    </div>
-                    <Button onClick={handleSaveProfile}>
-                      Save Changes
-                    </Button>
-                  </div>
+                  {loading ? <PageLoading /> : (
+                    <>
+                      <div className="flex items-center gap-4">
+                        <div className="h-20 w-20 rounded-full bg-primary-100 flex items-center justify-center">
+                          <User className="h-10 w-10 text-primary-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{user?.name || 'User'}</h3>
+                          <p className="text-gray-500">{user?.email}</p>
+                          <p className="text-sm text-gray-400">Member since {user?.created_at ? formatDate(user.created_at) : 'Unknown'}</p>
+                        </div>
+                      </div>
+                      <dl className="grid sm:grid-cols-2 gap-4 text-sm">
+                        <div><dt className="text-gray-500">Tax jurisdiction</dt><dd className="font-medium">{user?.tax_jurisdiction || '—'}</dd></div>
+                        <div><dt className="text-gray-500">Financial year</dt><dd className="font-medium">{user?.financial_year || '—'}</dd></div>
+                        <div><dt className="text-gray-500">Employment</dt><dd className="font-medium">{user?.employment_type || '—'}</dd></div>
+                        <div><dt className="text-gray-500">Preferred regime</dt><dd className="font-medium">{user?.preferred_tax_regime || 'Not specified'}</dd></div>
+                      </dl>
+                      <div className="border-t border-gray-100 pt-4">
+                        <h4 className="font-medium text-gray-900 mb-1">Workspace setup</h4>
+                        <p className="text-sm text-gray-500 mb-3">
+                          {ws ? `${ws.userType} · ${ws.incomeSources.length} income source(s) · FY ${ws.taxPeriod}` : 'Not completed yet.'}
+                        </p>
+                        <Button variant="secondary" onClick={() => router.push('/onboarding')}>
+                          {ws ? 'Redo setup' : 'Complete setup'}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-400">Profile editing via API is not available yet — values shown are what you registered with. Server-side profile updates are on the roadmap; nothing here pretends to save.</p>
+                    </>
+                  )}
                 </div>
               )}
 
               {activeTab === 'preferences' && (
                 <div id="preferences-panel" role="tabpanel" aria-labelledby="preferences-tab" className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Notification Preferences</h3>
-                    <div className="space-y-4">
-                      {[
-                        { id: 'email_alerts', label: 'Email Alerts', description: 'Receive email notifications for deadlines and obligations' },
-                        { id: 'deadline_reminders', label: 'Deadline Reminders', description: 'Get reminded 7 days before tax deadlines' },
-                        { id: 'obligation_alerts', label: 'Obligation Alerts', description: 'Notifications when new obligations are detected' },
-                        { id: 'weekly_summary', label: 'Weekly Summary', description: 'Weekly tax readiness summary email' },
-                      ].map((pref) => (
-                        <label key={pref.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                          <div>
-                            <p className="font-medium text-gray-900">{pref.label}</p>
-                            <p className="text-sm text-gray-500">{pref.description}</p>
-                          </div>
-                          <input
-                            type="checkbox"
-                            defaultChecked
-                            className="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                          />
-                        </label>
-                      ))}
-                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">In-app alerts</h3>
+                    <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-700">Compliance, invoice and document alerts in Notifications</span>
+                      <input type="checkbox" checked={inAppAlerts} onChange={(e) => setInAppAlerts(e.target.checked)} className="h-5 w-5" />
+                    </label>
+                    <p className="text-xs text-gray-400 mt-1">No paid email/SMS providers. Alerts are in-app only by design.</p>
                   </div>
-                  <div className="border-t border-gray-100 pt-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Display Preferences</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
-                        <Select
-                          value="INR"
-                          onChange={() => {}}
-                          options={[
-                            { value: 'INR', label: 'Indian Rupee (₹)' },
-                            { value: 'USD', label: 'US Dollar ($)' },
-                          ]}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Date Format</label>
-                        <Select
-                          value="DD/MM/YYYY"
-                          onChange={() => {}}
-                          options={[
-                            { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
-                            { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
-                            { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
-                          ]}
-                        />
-                      </div>
-                    </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">AI assistance</h3>
+                    <label className="block text-sm text-gray-700 mb-1" htmlFor="ai-pref">Explanations style</label>
+                    <select id="ai-pref" value={aiPref} onChange={(e) => setAiPref(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white border-gray-300">
+                      <option value="enabled">Enabled (deterministic results + friendly explanations)</option>
+                      <option value="minimal">Minimal (facts only, no extra phrasing)</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">Your financial data is never used for model training. Tax and accounting math is always deterministic, regardless of this setting.</p>
                   </div>
+                  <Button onClick={savePrefs}>Save preferences</Button>
                 </div>
               )}
 
               {activeTab === 'security' && (
                 <div id="security-panel" role="tabpanel" aria-labelledby="security-tab" className="space-y-6">
-                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                    <h3 className="font-medium text-blue-900 mb-2">Demo Mode Notice</h3>
-                    <p className="text-blue-800 text-sm">
-                      This is a demo version. Authentication and security features are simulated.
-                      In production, this section would include password management, 2FA, and session controls.
-                    </p>
-                  </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Password</h3>
-                    <Button variant="secondary">Change Password</Button>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">How you are protected</h3>
+                    <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
+                      <li>JWT Bearer authentication with bcrypt-hashed passwords</li>
+                      <li>Server-side tenant isolation on every data request</li>
+                      <li>Rate-limited login/register and chat endpoints</li>
+                      <li>Ownership-checked document downloads (never public URLs)</li>
+                    </ul>
                   </div>
-                  <div className="border-t border-gray-100 pt-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Two-Factor Authentication</h3>
-                    <Button variant="secondary">Enable 2FA</Button>
+                  <div className="border-t border-gray-100 pt-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Change password</h3>
+                    <PasswordForm />
                   </div>
-                  <div className="border-t border-gray-100 pt-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Active Sessions</h3>
-                    <p className="text-sm text-gray-500">Session management would appear here in production.</p>
+                  <div className="border-t border-gray-100 pt-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Sessions</h3>
+                    <SessionsPanel />
                   </div>
+                  <p className="text-xs text-gray-400">Two-factor authentication is not shipped yet — deliberately absent here rather than simulated. Password resets use single-use 30-minute tokens.</p>
                 </div>
               )}
 
               {activeTab === 'data' && (
                 <div id="data-panel" role="tabpanel" aria-labelledby="data-tab" className="space-y-6">
-                  <div className="p-4 bg-yellow-50 border border-yellow-100 rounded-lg">
-                    <h3 className="font-medium text-yellow-900 mb-2">Demo Mode Notice</h3>
-                    <p className="text-yellow-800 text-sm">
-                      Data export and deletion features are simulated in demo mode.
-                    </p>
-                  </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Export Data</h3>
-                    <div className="flex flex-wrap gap-4">
-                      <Button variant="secondary">Export Transactions (CSV)</Button>
-                      <Button variant="secondary">Export All Data (JSON)</Button>
-                    </div>
-                  </div>
-                  <div className="border-t border-gray-100 pt-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Import Data</h3>
-                    <Button variant="secondary">Import Transactions (CSV)</Button>
-                  </div>
-                  <div className="border-t border-gray-100 pt-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Danger Zone</h3>
-                    <div className="p-4 bg-red-50 border border-red-100 rounded-lg">
-                      <p className="text-red-800 text-sm mb-4">
-                        Deleting your account will permanently remove all your data. This action cannot be undone.
-                      </p>
-                      <Button variant="danger" onClick={logout}>
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Sign Out
+                    <CardHeader><CardTitle>Export my data (real downloads)</CardTitle></CardHeader>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Button variant="secondary" onClick={() => downloadAuthed('/exports/transactions.csv', 'transactions.csv')}>
+                        <Download className="h-4 w-4 mr-2" />Transactions (CSV)
+                      </Button>
+                      <Button variant="secondary" onClick={() => downloadAuthed('/exports/invoices.csv', 'invoices.csv')}>
+                        <Download className="h-4 w-4 mr-2" />Invoices (CSV)
+                      </Button>
+                      <Button variant="secondary" onClick={() => downloadAuthed('/exports/parties.csv', 'parties.csv')}>
+                        <Download className="h-4 w-4 mr-2" />Parties (CSV)
+                      </Button>
+                      <Button variant="secondary" onClick={() => downloadAuthed('/exports/me', 'taxshield-export.json')}>
+                        <Download className="h-4 w-4 mr-2" />All data (JSON)
                       </Button>
                     </div>
+                  </div>
+                  <div className="border-t border-gray-100 pt-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Workspace on this device</h3>
+                    <Button variant="secondary" onClick={() => { clearWorkspace(); toast.success('Local workspace cleared'); router.push('/onboarding'); }}>
+                      Reset local setup
+                    </Button>
+                  </div>
+                  <div className="border-t border-gray-100 pt-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Consent preferences</h3>
+                    <ConsentsPanel />
+                  </div>
+                  <div className="border-t border-gray-100 pt-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete account</h3>
+                    <DeletionPanel />
                   </div>
                 </div>
               )}

@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 venv/
+.venv/
 .env
 .env.local
 .env.*.local
@@ -21,9 +22,22 @@ htmlcov/
 *.swp
 *.swo
 
-# OS
+# OS - macOS (removed from repo; keep ignored)
 .DS_Store
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+__MACOSX/
+
+# OS - Windows
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
 
 # Logs
 *.log
@@ -34,6 +48,10 @@ yarn-error.log*
 # Testing
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
 
 # Database
 *.db
@@ -43,4 +61,4 @@ coverage/
 uploads/
 
 # Docker
-.docker/
+.docker/*.tsbuildinfo

@@ -25,7 +25,7 @@ INTENTS = ["CHECK_READINESS", "EXPLAIN_READINESS", "SHOW_MISSING_DOCUMENTS",
            "SHOW_ALERTS", "EXPLAIN_ALERT", "SHOW_DEADLINES", "SHOW_OBLIGATIONS",
            "FINANCIAL_SUMMARY", "TAX_ESTIMATE", "SCENARIO_ANALYSIS", "DOCUMENT_STATUS",
            "TRANSACTION_SEARCH", "PROFILE_INFORMATION", "SYSTEM_HELP", "NAVIGATION",
-           "GREETING", "UNKNOWN"]
+           "GREETING", "TAX_OWED", "OVERDUE_INVOICES", "ATTENTION_TODAY", "UNKNOWN"]
 
 INTENT_KEYS = {
     "CHECK_READINESS": ["readiness score", "readiness", "score", "ready", "score enna", "score kitna"],
@@ -44,6 +44,13 @@ INTENT_KEYS = {
     "SYSTEM_HELP": ["help", "how", "what can you", "udhavi", "madad"],
     "NAVIGATION": ["open", "go to", "page", "show dashboard"],
     "GREETING": ["hi", "hello", "vanakkam", "namaste", "hey"],
+    # Phase 10: deterministic assistant endpoints (tool-backed, never guessed).
+    "TAX_OWED": ["how much tax do i owe", "tax do i owe", "tax owed", "pending payment",
+                 "payments pending", "outstanding tax", "tax balance"],
+    "OVERDUE_INVOICES": ["overdue invoice", "invoices are overdue", "who owes me",
+                         "owes me money", "unpaid invoice", "customer owes", "receivable due"],
+    "ATTENTION_TODAY": ["needs my attention", "needs attention", "what should i do today",
+                        "today's actions", "urgent items", "what is urgent"],
 }
 
 DISCLAIMER = ("TaxShield provides preliminary analysis based on the information available "
@@ -352,6 +359,56 @@ async def answer(uid: str, text: str, user, db, analysis_engine, scenario_extra:
     elif intent in ("SYSTEM_HELP", "GREETING", "NAVIGATION"):
         resp = tr("greeting" if intent == "GREETING" else "help", lang)
         nav = "/dashboard" if intent == "NAVIGATION" else None
+    elif intent == "TAX_OWED":
+        # Deterministic: straight from the dashboard summary (see /assistant/tax-owed).
+        needs_disclaimer = True
+        resp = pick(lang,
+            f"You owe {inr(sdict.get('outstanding_tax', 0))} (estimated liability "
+            f"{inr(sdict.get('estimated_liability', 0))}, paid {inr(sdict.get('tax_paid', 0))}, "
+            f"{sdict.get('regime', 'old')} regime).",
+            f"Neenga {inr(sdict.get('outstanding_tax', 0))} pay pannanum (estimate).",
+            f"நீங்கள் {inr(sdict.get('outstanding_tax', 0))} செலுத்த வேண்டும் (மதிப்பீடு).",
+            f"आपको {inr(sdict.get('outstanding_tax', 0))} देना है (estimate)।")
+        nav = "/dashboard"
+    elif intent == "OVERDUE_INVOICES":
+        try:
+            invs = await db.invoices.find(
+                {"user_id": user.id if hasattr(user, 'id') else user['_id'],
+                 "kind": "sale",
+                 "status": {"$in": ["sent", "viewed", "partially_paid", "overdue"]}}).to_list(50)
+            now = datetime.utcnow()
+            od = []
+            for _iv in invs:
+                try:
+                    _due = _iv["due_date"] if isinstance(_iv.get("due_date"), datetime) \
+                        else datetime.fromisoformat(str(_iv.get("due_date")))
+                except Exception:
+                    continue
+                if _due < now:
+                    od.append(f"{_iv.get('number', '')} ({inr(_iv.get('balance', 0))})")
+        except Exception:
+            od = []
+        if not od:
+            resp = pick(lang, "No overdue invoices right now.", "Overdue invoice ethuvum illa.",
+                        "தற்போது தாமதமான விலைப்பட்டியல்கள் எதுவும் இல்லை.",
+                        "कोई overdue invoice नहीं है।")
+        else:
+            resp = pick(lang, f"Overdue invoices ({len(od)}): " + ", ".join(od[:5]) + ".",
+                        f"Overdue invoices ({len(od)}): " + ", ".join(od[:5]) + ".",
+                        f"தாமதமான விலைப்பட்டியல்கள் ({len(od)}): " + ", ".join(od[:5]) + ".",
+                        f"Overdue invoices ({len(od)}): " + ", ".join(od[:5]) + "।")
+        nav = "/receivables"
+    elif intent == "ATTENTION_TODAY":
+        risks = snap["risks"] or []
+        highs = len([r for r in risks if r.get("severity") == "high"])
+        miss = len([o for o in obligations if "missing" in o.title.lower()])
+        resp = pick(lang,
+            f"Today: {highs} high-risk alert(s), {miss} missing-document item(s), "
+            f"{len(deadlines)} upcoming deadline(s), readiness {score_n}/100.",
+            f"Inniku: {highs} high-risk, {miss} missing documents, readiness {score_n}/100.",
+            f"இன்று: {highs} அதிக ஆபத்து, {miss} காணாமல் போன ஆவணங்கள், தயார்நிலை {score_n}/100.",
+            f"आज: {highs} high-risk, {miss} missing documents, readiness {score_n}/100।")
+        nav = "/dashboard"
     else:
         resp = tr("fallback", lang)
 
