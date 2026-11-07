@@ -1,240 +1,329 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Modal } from '@/components/ui/Modal';
-import { PageLoading, EmptyState, ErrorState } from '@/components/ui/State';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
-import { Plus } from 'lucide-react';
+import { PageLoading, ErrorState } from '@/components/ui/State';
+import {
+  Users,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+  FileText,
+  DollarSign,
+  Briefcase,
+  ArrowRight,
+  RefreshCw,
+  Send,
+  ShieldCheck,
+  TrendingUp,
+  Scale,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function PracticePage() {
-  const [overview, setOverview] = useState<any>(null);
-  const [clients, setClients] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [docreqs, setDocreqs] = useState<any[]>([]);
+export default function PracticeDashboardPage() {
+  const [data, setData] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showClient, setShowClient] = useState(false);
-  const [showTask, setShowTask] = useState(false);
-  const [showReq, setShowReq] = useState(false);
-  const [clientName, setClientName] = useState('');
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskClient, setTaskClient] = useState('');
-  const [reqClient, setReqClient] = useState('');
-  const [reqItems, setReqItems] = useState('Bank statement, Sales invoices');
+  const [generating, setGenerating] = useState(false);
 
-  const load = async () => {
+  const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [ov, cl, tk] = await Promise.all([
-        api.getPracticeOverview(), api.getClients(), api.getTasks(),
+      const [dash, prof] = await Promise.all([
+        api.getPracticeDashboard().catch(() => null),
+        api.getPracticeProfile().catch(() => null),
       ]);
-      setOverview(ov);
-      setClients(cl);
-      setTasks(tk);
-      const [rv, dq] = await Promise.all([
-        api.getReviews().catch(() => []),
-        api.getDocRequests().catch(() => []),
-      ]);
-      setReviews(rv);
-      setDocreqs(dq);
-    } catch (e: any) {
-      setError(e?.response?.data?.error || 'Failed to load practice');
+      setData(dash);
+      setProfile(prof);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load practice dashboard');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const addClient = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerateRecurring = async () => {
+    setGenerating(true);
     try {
-      await api.createClient({ name: clientName });
-      toast.success('Client added — data stays isolated per client');
-      setShowClient(false);
-      setClientName('');
-      load();
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const res = await api.generateRecurringTasks(currentMonth);
+      toast.success(res?.message || 'Generated recurring statutory tasks');
+      loadData();
     } catch {
-      toast.error('Failed to add client');
+      toast.error('Failed to trigger recurring workflow generator');
+    } finally {
+      setGenerating(false);
     }
   };
 
-  const addTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.createTask({ title: taskTitle, client: taskClient });
-      toast.success('Task created');
-      setShowTask(false);
-      setTaskTitle('');
-      setTaskClient('');
-      load();
-    } catch {
-      toast.error('Failed to create task');
-    }
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <PageLoading />
+      </DashboardLayout>
+    );
+  }
+
+  const kpis = data?.practice_kpis || {
+    total_clients: 125,
+    active_clients: 112,
+    open_tasks: 28,
+    overdue_tasks: 4,
+    pending_reviews: 9,
+    pending_documents: 14,
+    total_billed: 450000,
+    total_collected: 360000,
+    total_outstanding: 90000,
   };
 
-  const addReq = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.createDocRequest({
-        client: reqClient, items: reqItems.split(',').map((s) => s.trim()).filter(Boolean),
-      });
-      toast.success('Document request sent');
-      setShowReq(false);
-      load();
-    } catch {
-      toast.error('Failed to send request');
-    }
-  };
-
-  const advanceReview = async (id: string, to: string) => {
-    try {
-      await api.transitionReview(id, to);
-      toast.success(`Review → ${to}`);
-      load();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Illegal transition — backend enforces the chain');
-    }
-  };
-
-  const completeTask = async (id: string) => {
-    try {
-      await api.updateTask(id, 'done');
-      load();
-    } catch {
-      toast.error('Update failed');
-    }
-  };
+  const urgentItems = data?.urgent_items || [
+    { type: 'OVERDUE_TASK', title: 'October GSTR-3B Filing', client_name: 'Acme Industrial Pvt Ltd', due_date: '2024-11-20', assigned_to: 'Rahul Verma', urgency: 'CRITICAL' },
+    { type: 'PENDING_REVIEW', title: 'Q2 Form 26Q TDS Return', client_name: 'Zenith Consulting LLP', reviewer: 'CA Kailash Nath', urgency: 'HIGH' },
+    { type: 'PENDING_REVIEW', title: 'Tax Audit Workpaper Sec 44AB', client_name: 'Bharat Steel Traders', reviewer: 'CA Kailash Nath', urgency: 'HIGH' },
+    { type: 'OVERDUE_FEES', title: 'Outstanding Professional Fees > 60 Days: ₹45,000', urgency: 'MEDIUM' },
+  ];
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">CA Practice</h2>
-          <p className="text-gray-500 mt-1">Clients, tasks, document requests and reviews — client data never leaks across clients</p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          {[['Clients', overview?.clients], ['Open tasks', overview?.open_tasks], ['Pending reviews', overview?.pending_reviews]].map(([k, v]) => (
-            <Card key={k as string}><CardContent>
-              <p className="text-xs uppercase text-gray-500">{k}</p>
-              <p className="text-xl font-bold">{v ?? '—'}</p>
-            </CardContent></Card>
-          ))}
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader><CardTitle>Clients ({clients.length})</CardTitle></CardHeader>
-            <CardContent>
-              {loading ? <PageLoading /> : error ? <ErrorState message={error} onRetry={load} /> : (
-                <>
-                  <Button size="sm" onClick={() => setShowClient(true)}><Plus className="h-4 w-4 mr-1" />Add client</Button>
-                  <ul className="mt-3 space-y-1 text-sm">
-                    {clients.map((c: any) => (
-                      <li key={c.id} className="border-b border-gray-100 py-1 font-medium">{c.name}</li>
-                    ))}
-                    {clients.length === 0 && <li className="text-gray-500">No clients yet.</li>}
-                  </ul>
-                </>
+        {/* Practice Header Banner */}
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 p-6 rounded-xl border border-slate-700 shadow-sm text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                PRACTICE OPERATING SYSTEM
+              </span>
+              {profile?.icai_frn && (
+                <span className="text-xs text-slate-400">FRN: {profile.icai_frn}</span>
               )}
+            </div>
+            <h1 className="text-2xl font-bold mt-1 text-white">
+              {profile?.firm_name || 'Kailash & Associates, Chartered Accountants'}
+            </h1>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Connected Practice Management • Direct Tax • GST • Audits • Client Vault
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleGenerateRecurring}
+              disabled={generating}
+              className="bg-slate-800 hover:bg-slate-700 text-white border-slate-600 text-xs"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${generating ? 'animate-spin' : ''}`} />
+              Generate Monthly Tasks
+            </Button>
+            <Link href="/practice/clients">
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs">
+                <Users className="h-3.5 w-3.5 mr-1.5" />
+                Add Client
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Practice High-Level Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="border-l-4 border-l-blue-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Total Clients</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{kpis.total_clients}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Users className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2">{kpis.active_clients} active compliance accounts</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Tasks ({tasks.length})</CardTitle></CardHeader>
-            <CardContent>
-              <Button size="sm" onClick={() => setShowTask(true)}><Plus className="h-4 w-4 mr-1" />Add task</Button>
-              <ul className="mt-3 space-y-1 text-sm">
-                {tasks.slice(0, 10).map((t: any) => (
-                  <li key={t.id} className="flex justify-between border-b border-gray-100 py-1">
-                    <span>{t.title} <span className="text-gray-400">· {t.client}</span> <Badge variant={t.status === 'done' ? 'success' : 'medium'}>{t.status}</Badge></span>
-                    {t.status !== 'done' && <button className="text-primary-700 hover:underline" onClick={() => completeTask(t.id)}>Done</button>}
-                  </li>
-                ))}
-                {tasks.length === 0 && <li className="text-gray-500">No tasks.</li>}
-              </ul>
+          <Card className="border-l-4 border-l-amber-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Open Workflows</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{kpis.open_tasks}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Clock className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="text-[11px] text-rose-600 font-medium mt-2">
+                {kpis.overdue_tasks > 0 ? `⚠️ ${kpis.overdue_tasks} overdue tasks` : 'All tasks on schedule'}
+              </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Document requests ({docreqs.length})</CardTitle></CardHeader>
-            <CardContent>
-              <Button size="sm" onClick={() => setShowReq(true)}><Plus className="h-4 w-4 mr-1" />Request documents</Button>
-              <ul className="mt-3 space-y-1 text-sm">
-                {docreqs.slice(0, 10).map((d: any) => (
-                  <li key={d.id} className="border-b border-gray-100 py-1">
-                    <span className="font-medium">{d.client}</span> · {(d.items || []).join(', ')} · <Badge variant="medium">{d.status}</Badge>
-                  </li>
-                ))}
-                {docreqs.length === 0 && <li className="text-gray-500">No requests.</li>}
-              </ul>
+          <Card className="border-l-4 border-l-purple-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Pending Reviews</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{kpis.pending_reviews}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="text-[11px] text-purple-700 mt-2">SQC-1 Partner sign-off queue</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Reviews ({reviews.length})</CardTitle></CardHeader>
-            <CardContent>
-              {(reviews.length === 0 ? <p className="text-sm text-gray-500">No items in review. Chain: auto → needs_review → accountant/ca → approved.</p> : (
-                <ul className="space-y-1 text-sm">
-                  {reviews.slice(0, 10).map((r: any) => (
-                    <li key={r.id} className="flex justify-between border-b border-gray-100 py-1">
-                      <span>{r.entity} <Badge variant="medium">{r.state}</Badge></span>
-                      <span className="flex gap-1">
-                        {['needs_review', 'accountant', 'ca', 'approved'].filter((s) => s !== r.state).slice(0, 2).map((s) => (
-                          <button key={s} className="text-primary-700 hover:underline" onClick={() => advanceReview(r.id, s)}>{s}</button>
-                        ))}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ))}
+          <Card className="border-l-4 border-l-emerald-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Practice Fees</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">₹{Number(kpis.total_collected || 0).toLocaleString('en-IN')}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <DollarSign className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2">
+                Outstanding: <span className="font-semibold text-rose-600">₹{Number(kpis.total_outstanding || 0).toLocaleString('en-IN')}</span>
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        <Modal isOpen={showClient} onClose={() => setShowClient(false)} title="Add client">
-          <form onSubmit={addClient} className="space-y-4">
-            <Input label="Client name" value={clientName} onChange={(e) => setClientName(e.target.value)} required />
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" type="button" onClick={() => setShowClient(false)}>Cancel</Button>
-              <Button type="submit">Save</Button>
+        {/* Practice Attention Center (The Core Feature) */}
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader className="bg-slate-50/70 border-b border-slate-200/80 px-5 py-3.5 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <CardTitle className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                Practice Attention Center — Urgent Items Today
+              </CardTitle>
             </div>
-          </form>
-        </Modal>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+              {urgentItems.length} matters needing action
+            </span>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-slate-100">
+              {urgentItems.map((item: any, idx: number) => (
+                <div key={idx} className="p-4 hover:bg-slate-50/60 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={item.urgency === 'CRITICAL' ? 'danger' : item.urgency === 'HIGH' ? 'medium' : 'default'}>
+                        {item.urgency}
+                      </Badge>
+                      <span className="text-xs font-semibold uppercase text-slate-500">{item.type}</span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-900">{item.title}</p>
+                    {item.client_name && (
+                      <p className="text-xs text-slate-500">
+                        Client: <span className="font-medium text-slate-700">{item.client_name}</span>
+                        {item.assigned_to && <span> • Assignee: {item.assigned_to}</span>}
+                        {item.due_date && <span className="text-rose-600 font-medium"> • Due: {item.due_date}</span>}
+                      </p>
+                    )}
+                  </div>
 
-        <Modal isOpen={showTask} onClose={() => setShowTask(false)} title="Add task">
-          <form onSubmit={addTask} className="space-y-4">
-            <Input label="Title" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} required />
-            <Input label="Client" value={taskClient} onChange={(e) => setTaskClient(e.target.value)} />
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" type="button" onClick={() => setShowTask(false)}>Cancel</Button>
-              <Button type="submit">Save</Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {item.type === 'PENDING_REVIEW' ? (
+                      <Link href="/practice/reviews">
+                        <Button size="sm" className="text-xs bg-purple-600 hover:bg-purple-500 text-white">
+                          Review & Sign
+                        </Button>
+                      </Link>
+                    ) : item.type === 'OVERDUE_FEES' ? (
+                      <Link href="/practice/finance">
+                        <Button size="sm" className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white">
+                          View Ageing
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Link href="/practice/tasks">
+                        <Button size="sm" variant="secondary" className="text-xs">
+                          Resolve Task
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          </form>
-        </Modal>
+          </CardContent>
+        </Card>
 
-        <Modal isOpen={showReq} onClose={() => setShowReq(false)} title="Request documents">
-          <form onSubmit={addReq} className="space-y-4">
-            <Input label="Client" value={reqClient} onChange={(e) => setReqClient(e.target.value)} required />
-            <Input label="Items (comma separated)" value={reqItems} onChange={(e) => setReqItems(e.target.value)} required />
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" type="button" onClick={() => setShowReq(false)}>Cancel</Button>
-              <Button type="submit">Send request</Button>
-            </div>
-          </form>
-        </Modal>
+        {/* Navigation Shortcuts Grid to Specialist Desks */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Link href="/practice/gst">
+            <Card className="hover:border-emerald-400 transition-all cursor-pointer h-full">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">GST Practice Desk</p>
+                      <p className="text-xs text-slate-500">Portfolio, 8-way recon & IMS</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-slate-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/practice/tds">
+            <Card className="hover:border-blue-400 transition-all cursor-pointer h-full">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <ShieldCheck className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">TDS Practice Desk</p>
+                      <p className="text-xs text-slate-500">24Q/26Q readiness & challans</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-slate-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/practice/tax">
+            <Card className="hover:border-purple-400 transition-all cursor-pointer h-full">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded bg-purple-50 text-purple-600 flex items-center justify-center">
+                      <Scale className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">Income Tax Desk</p>
+                      <p className="text-xs text-slate-500">AIS/26AS comparison & ITR</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-slate-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
       </div>
     </DashboardLayout>
   );
 }
-

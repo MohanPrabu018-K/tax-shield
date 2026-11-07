@@ -698,7 +698,39 @@ async def month_end(current_user: User = Depends(get_current_active_user)):
     inv = await db.invoices.find({"user_id": current_user.id}).to_list(None)
     docs = await db.documents.find({"user_id": current_user.id}).to_list(None)
     recon = await analysis_engine.reconcile_user(current_user.id)
-    return month_end_close(txs, inv, docs, recon)
+    result = month_end_close(txs, inv, docs, recon)
+    # guided steps: map each check to a clear next action
+    steps = []
+    for k, v in result["checks"].items():
+        steps.append({
+            "key": k, "status": v,
+            "label": k.replace("_", " ").title(),
+            "action": ("Review" if v != "ok" else "Done"),
+        })
+    result["steps"] = steps
+    return result
+
+
+@router.post("/close/month-end")
+async def month_end_complete(current_user: User = Depends(get_current_active_user)):
+    """Authenticated user explicitly marks the month closed after reviewing readiness."""
+    from app.intel import month_end_close
+    from app.analysis import analysis_engine
+
+    db = await get_database()
+    txs = await db.transactions.find({"user_id": current_user.id}).to_list(None)
+    inv = await db.invoices.find({"user_id": current_user.id}).to_list(None)
+    docs = await db.documents.find({"user_id": current_user.id}).to_list(None)
+    recon = await analysis_engine.reconcile_user(current_user.id)
+    result = month_end_close(txs, inv, docs, recon)
+    period = datetime.utcnow().strftime("%Y-%m")
+    await db.month_closes.update_one(
+        {"user_id": current_user.id, "period": period},
+        {"$set": {"closed_at": datetime.utcnow(), "closable": result["closable"],
+                  "checks": result["checks"]}},
+        upsert=True)
+    return {"period": period, "closed": True, "closable": result["closable"],
+            "message": "Month closed and recorded. Re-run the close summary any time to verify."}
 
 
 @router.post("/intel/what-changed")

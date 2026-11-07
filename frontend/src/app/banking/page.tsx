@@ -148,7 +148,7 @@ export default function BankingPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Reconciliation (TaxShield books ↔ AIS / 26AS)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Match Your Records (TaxShield books ↔ AIS / 26AS)</CardTitle></CardHeader>
           <CardContent>
             {recon.loading ? <PageLoading /> : recon.error ? (
               <ErrorState message={recon.error} onRetry={recon.reload} />

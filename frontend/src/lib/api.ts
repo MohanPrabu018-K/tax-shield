@@ -396,6 +396,16 @@ class ApiClient {
     return normalize(response.data);
   }
 
+  async createCreditNote(data: any) {
+    const response = await this.client.post('/credit-notes', data);
+    return normalize(response.data);
+  }
+
+  async createDebitNote(data: any) {
+    const response = await this.client.post('/debit-notes', data);
+    return normalize(response.data);
+  }
+
   async payInvoice(id: string, data: any) {
     const response = await this.client.post(`/invoices/${id}/payments`, data);
     return normalize(response.data);
@@ -453,6 +463,11 @@ class ApiClient {
 
   async getMonthEndClose() {
     const response = await this.client.get('/close/month-end');
+    return normalize(response.data);
+  }
+
+  async closeMonthEnd() {
+    const response = await this.client.post('/close/month-end');
     return normalize(response.data);
   }
 
@@ -738,6 +753,167 @@ class ApiClient {
 
   async executeDeletion(confirm: string, skip_grace = false) {
     const response = await this.client.post('/account/deletion/execute', { confirm, skip_grace });
+    return normalize(response.data);
+  }
+
+  async getOnboarding() {
+    const response = await this.client.get('/onboarding');
+    return normalize(response.data);
+  }
+
+  async putOnboarding(profile: any) {
+    const response = await this.client.put('/onboarding', profile);
+    return normalize(response.data);
+  }
+
+  // ---- TaxShield Professional Practice OS ----
+  async getPracticeDashboard() {
+    const response = await this.client.get('/practice/dashboard');
+    return normalize(response.data);
+  }
+
+  async getPracticeProfile() {
+    const response = await this.client.get('/practice/profile');
+    return normalize(response.data);
+  }
+
+  async savePracticeProfile(data: any) {
+    const response = await this.client.post('/practice/profile', data);
+    return normalize(response.data);
+  }
+
+  async getPracticeClients(params?: any) {
+    const response = await this.client.get('/practice/clients', { params });
+    return normalize(response.data);
+  }
+
+  async createPracticeClient(data: any) {
+    const response = await this.client.post('/practice/clients', data);
+    return normalize(response.data);
+  }
+
+  async getClient360(cid: string) {
+    const response = await this.client.get(`/practice/clients/${cid}/360`);
+    return normalize(response.data);
+  }
+
+  async getLeads() {
+    const response = await this.client.get('/practice/leads');
+    return normalize(response.data);
+  }
+
+  async createLead(data: any) {
+    const response = await this.client.post('/practice/leads', data);
+    return normalize(response.data);
+  }
+
+  async updateLeadStage(lid: string, stage: string) {
+    const response = await this.client.patch(`/practice/leads/${lid}/stage`, { stage });
+    return normalize(response.data);
+  }
+
+  async convertLead(lid: string) {
+    const response = await this.client.post(`/practice/leads/${lid}/convert`, {});
+    return normalize(response.data);
+  }
+
+  async getServiceCatalog() {
+    const response = await this.client.get('/practice/services');
+    return normalize(response.data);
+  }
+
+  async getEngagements(clientId?: string) {
+    const response = await this.client.get('/practice/engagements', { params: { client_id: clientId } });
+    return normalize(response.data);
+  }
+
+  async createEngagement(data: any) {
+    const response = await this.client.post('/practice/engagements', data);
+    return normalize(response.data);
+  }
+
+  async generateRecurringTasks(periodMonth: string) {
+    const response = await this.client.post('/practice/workflows/generate-recurring', { period_month: periodMonth });
+    return normalize(response.data);
+  }
+
+  async getProfessionalTasks(params?: any) {
+    const response = await this.client.get('/practice/tasks', { params });
+    return normalize(response.data);
+  }
+
+  async createProfessionalTask(data: any) {
+    const response = await this.client.post('/practice/tasks', data);
+    return normalize(response.data);
+  }
+
+  async transitionTask(tid: string, target_status: string, notes?: string) {
+    const response = await this.client.patch(`/practice/tasks/${tid}/transition`, { target_status, notes });
+    return normalize(response.data);
+  }
+
+  async getTeamWorkload() {
+    const response = await this.client.get('/practice/team/workload');
+    return normalize(response.data);
+  }
+
+  async getWorkpapers(clientId?: string) {
+    const response = await this.client.get('/practice/workpapers', { params: { client_id: clientId } });
+    return normalize(response.data);
+  }
+
+  async createWorkpaper(data: any) {
+    const response = await this.client.post('/practice/workpapers', data);
+    return normalize(response.data);
+  }
+
+  async getAuditCompleteness(clientId?: string) {
+    const response = await this.client.get('/practice/audit/completeness', { params: { client_id: clientId } });
+    return normalize(response.data);
+  }
+
+  async getUDINRecords() {
+    const response = await this.client.get('/practice/udin');
+    return normalize(response.data);
+  }
+
+  async recordUDIN(data: any) {
+    const response = await this.client.post('/practice/udin', data);
+    return normalize(response.data);
+  }
+
+  async getGSTPracticePortfolio() {
+    const response = await this.client.get('/practice/gst/portfolio');
+    return normalize(response.data);
+  }
+
+  async run8WayGSTRecon(data: any) {
+    const response = await this.client.post('/practice/gst/reconcile-8way', data);
+    return normalize(response.data);
+  }
+
+  async getPracticeFeeAgeing() {
+    const response = await this.client.get('/practice/finance/ageing');
+    return normalize(response.data);
+  }
+
+  async getPracticeInvoices() {
+    const response = await this.client.get('/practice/finance/invoices');
+    return normalize(response.data);
+  }
+
+  async createPracticeInvoice(data: any) {
+    const response = await this.client.post('/practice/finance/invoices', data);
+    return normalize(response.data);
+  }
+
+  async recordPracticeReceipt(data: any) {
+    const response = await this.client.post('/practice/finance/receipts', data);
+    return normalize(response.data);
+  }
+
+  async getPortalDashboard() {
+    const response = await this.client.get('/portal/dashboard');
     return normalize(response.data);
   }
 

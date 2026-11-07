@@ -1,6 +1,6 @@
 'use client';
 
-export type UserType = 'individual' | 'freelancer' | 'business' | 'accountant' | 'ca';
+export type UserType = 'individual' | 'freelancer' | 'business' | 'accountant' | 'ca' | 'ca_partner' | 'gst_specialist' | 'tax_specialist' | 'audit_staff' | 'client';
 
 export interface WorkspaceProfile {
   userType: UserType;
@@ -37,7 +37,7 @@ export function clearWorkspace() {
 export function visibleModules(userType: UserType | undefined): Set<string> {
   const all = new Set(['practice', 'pos', 'inventory', 'gst', 'tds']);
   if (!userType) return all;
-  if (userType === 'individual') {
+  if (userType === 'individual' || userType === 'client') {
     all.delete('practice');
     all.delete('pos');
     all.delete('inventory');
@@ -48,6 +48,6 @@ export function visibleModules(userType: UserType | undefined): Set<string> {
     all.delete('inventory');
   }
   if (userType === 'business') return all;
-  // accountant / ca: everything
+  // accountant / ca / specialists: everything
   return all;
 }

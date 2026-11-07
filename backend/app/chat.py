@@ -51,6 +51,11 @@ INTENT_KEYS = {
                          "owes me money", "unpaid invoice", "customer owes", "receivable due"],
     "ATTENTION_TODAY": ["needs my attention", "needs attention", "what should i do today",
                         "today's actions", "urgent items", "what is urgent"],
+    "PRACTICE_GST_PENDING": ["clients have gst pending", "gst pending", "clients gst pending", "pending gst"],
+    "PRACTICE_WORKLOAD": ["highest pending workload", "staff workload", "team workload", "staff member workload", "who has highest work", "workload", "staff"],
+    "PRACTICE_MISSING_DOCS": ["documents are incomplete", "clients whose documents", "missing client documents", "client documents incomplete", "incomplete documents"],
+    "PRACTICE_OVERDUE_FEES": ["overdue client fees", "unpaid client fees", "practice fees overdue", "overdue practice fees", "client fees", "overdue fees"],
+    "PRACTICE_ATTENTION": ["clients needing attention", "needing attention", "practice attention today", "attention center", "practice attention", "attention"],
 }
 
 DISCLAIMER = ("TaxShield provides preliminary analysis based on the information available "
@@ -409,6 +414,56 @@ async def answer(uid: str, text: str, user, db, analysis_engine, scenario_extra:
             f"இன்று: {highs} அதிக ஆபத்து, {miss} காணாமல் போன ஆவணங்கள், தயார்நிலை {score_n}/100.",
             f"आज: {highs} high-risk, {miss} missing documents, readiness {score_n}/100।")
         nav = "/dashboard"
+    elif intent == "PRACTICE_GST_PENDING":
+        try:
+            uid = user.id if hasattr(user, 'id') else user['_id']
+            gst_tasks = await db.tasks.find({"user_id": uid, "service_category": "gst", "status": {"$nin": ["COMPLETED", "APPROVED", "CANCELLED"]}}).to_list(20)
+            cnames = list({t.get("client_name") or "Client" for t in gst_tasks})
+        except Exception:
+            cnames = []
+        if not cnames:
+            resp = pick(lang, "All client GST returns are up to date! No pending GST tasks.", "All client GST returns up to date.", "அனைத்து வாடிக்கையாளர் GST தாக்கல் முடிந்தது.", "सभी क्लाइंट्स के GST रिटर्न्स पूर्ण हैं।")
+        else:
+            resp = pick(lang, f"GST pending for {len(cnames)} client(s): " + ", ".join(cnames[:5]) + ".",
+                        f"GST pending for {len(cnames)} client(s): " + ", ".join(cnames[:5]) + ".",
+                        f"GST நிலுவையில் உள்ள வாடிக்கையாளர்கள் ({len(cnames)}): " + ", ".join(cnames[:5]) + ".",
+                        f"{len(cnames)} क्लाइंट्स का GST कार्य लंबित है: " + ", ".join(cnames[:5]) + "।")
+        nav = "/practice/gst"
+    elif intent == "PRACTICE_WORKLOAD":
+        nav = "/practice/team"
+        resp = pick(lang, "Opening Practice Team Workload Dashboard. Checking staff capacity, open assignments and review queues.",
+                    "Opening Team Workload dashboard.", "குழு பணிச்சுமை டாஷ்போர்டு திறக்கப்படுகிறது.", "टीम वर्कलोड डैशबोर्ड खोला जा रहा है।")
+    elif intent == "PRACTICE_MISSING_DOCS":
+        try:
+            uid = user.id if hasattr(user, 'id') else user['_id']
+            docs_req = await db.doc_requests.find({"user_id": uid, "status": "requested"}).to_list(20)
+            pending_clients = list({d.get("client") or d.get("client_name") or "Client" for d in docs_req})
+        except Exception:
+            pending_clients = []
+        if not pending_clients:
+            resp = pick(lang, "No clients with pending document requests right now.", "No pending document requests.", "நிலுவையில் உள்ள ஆவண கோரிக்கைகள் இல்லை.", "कोई लंबित दस्तावेज़ अनुरोध नहीं हैं।")
+        else:
+            resp = pick(lang, f"Clients with incomplete documents ({len(pending_clients)}): " + ", ".join(pending_clients[:5]) + ".",
+                        f"Clients with incomplete documents ({len(pending_clients)}): " + ", ".join(pending_clients[:5]) + ".",
+                        f"ஆவணங்கள் முழுமையடையாத வாடிக்கையாளர்கள் ({len(pending_clients)}): " + ", ".join(pending_clients[:5]) + ".",
+                        f"अपूर्ण दस्तावेज़ वाले क्लाइंट्स ({len(pending_clients)}): " + ", ".join(pending_clients[:5]) + "।")
+        nav = "/practice/documents"
+    elif intent == "PRACTICE_OVERDUE_FEES":
+        try:
+            uid = user.id if hasattr(user, 'id') else user['_id']
+            invs = await db.practice_invoices.find({"user_id": uid, "status": {"$in": ["ISSUED", "PARTIAL", "OVERDUE"]}}).to_list(50)
+            total_unpaid = sum(float(i.get("total_amount", 0)) - float(i.get("paid_amount", 0)) for i in invs)
+        except Exception:
+            total_unpaid = 0.0
+        resp = pick(lang, f"Outstanding practice fees: {inr(total_unpaid)} across {len(invs) if 'invs' in locals() else 0} invoice(s).",
+                    f"Outstanding practice fees: {inr(total_unpaid)}.",
+                    f"நிலுவையில் உள்ள தொழில்முறை கட்டணம்: {inr(total_unpaid)}.",
+                    f"बकाया प्रैक्टिस फीस: {inr(total_unpaid)}।")
+        nav = "/practice/finance"
+    elif intent == "PRACTICE_ATTENTION":
+        resp = pick(lang, "Opening Practice Attention Center: highlighting high-risk clients, approaching statutory deadlines, and urgent review notes.",
+                    "Opening Practice Attention Center.", "பயிற்சி கவன மையம் திறக்கப்படுகிறது.", "प्रैक्टिस अटेंशन सेंटर खोला जा रहा है।")
+        nav = "/practice"
     else:
         resp = tr("fallback", lang)
 

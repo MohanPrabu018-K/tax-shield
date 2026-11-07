@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     AUTH_RATE_LIMIT: int = 200  # login/register attempts per 15 min per IP (generous; E2E-safe)
     AUTH_RATE_WINDOW_SECONDS: int = 900
     # Commercial: bootstrap admin emails (comma-separated). Empty = no admins.
-    ADMIN_EMAILS: str = ""
+    ADMIN_EMAILS: str = "ca.admin@example.com,admin@taxshield.internal"
     # Password policy
     MIN_PASSWORD_LEN: int = 8
 

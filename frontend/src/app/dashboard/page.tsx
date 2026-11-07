@@ -86,11 +86,11 @@ export default function DashboardPage() {
   const stats = [
     { label: 'Revenue', value: formatCurrency(summary.total_income || 0) },
     { label: 'Taxable Income', value: formatCurrency(summary.taxable_income || 0) },
-    { label: 'Tax Estimate', value: formatCurrency(summary.estimated_liability || 0) },
+    { label: 'Estimated Tax Due', value: formatCurrency(summary.estimated_liability || 0) },
     { label: 'Tax Paid', value: formatCurrency(summary.tax_paid || 0) },
     { label: 'Outstanding Tax', value: formatCurrency(summary.outstanding_tax || 0) },
-    { label: 'Receivable', value: formatCurrency(rp?.receivable?.total || 0) },
-    { label: 'Payable', value: formatCurrency(rp?.payable?.total || 0) },
+    { label: 'Money Owed to You', value: formatCurrency(rp?.receivable?.total || 0) },
+    { label: 'Bills You Owe', value: formatCurrency(rp?.payable?.total || 0) },
     { label: 'Overdue Invoices', value: formatCurrency(overdue?.total || 0) },
   ];
 

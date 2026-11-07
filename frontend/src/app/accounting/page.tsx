@@ -156,7 +156,7 @@ export default function AccountingPage() {
                 </CardContent></Card>
             )}
             {tab === 'trial' && (
-              <Card><CardHeader><CardTitle>Trial Balance · {data?.balanced ? 'Balanced ✓' : 'Out of balance ✗'}</CardTitle></CardHeader>
+              <Card><CardHeader><CardTitle>Accounting Balance Check (Trial Balance) · {data?.balanced ? 'Balanced ✓' : 'Out of balance ✗'}</CardTitle></CardHeader>
                 <CardContent className="p-0">
                   <Table><TableHeader><TableRow><TableHead>Account</TableHead><TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead></TableRow></TableHeader>
                     <TableBody>

@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { saveWorkspace, UserType } from '@/lib/workspace';
+import { saveWorkspace, getWorkspace, UserType } from '@/lib/workspace';
 import { INCOME_CATEGORIES } from '@/types';
+import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 const STEPS = ['You', 'Business', 'Tax setup', 'Done'];
@@ -24,10 +25,56 @@ export default function OnboardingPage() {
   const [incomeSources, setIncomeSources] = useState<string[]>(['salary']);
   const [taxPeriod, setTaxPeriod] = useState('2024-25');
 
-  const toggleSource = (v: string) =>
-    setIncomeSources((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
+  // Server-persisted onboarding: hydrate from backend, fall back to localStorage
+  useEffect(() => {
+    (async () => {
+      try {
+        const r: any = await api.getOnboarding?.();
+        const o = r?.onboarding;
+        if (o) {
+          if (o.userType) setUserType(o.userType);
+          if (o.businessName) setBusinessName(o.businessName);
+          if (o.businessType) setBusinessType(o.businessType);
+          if (typeof o.gstApplicable === 'boolean') setGstApplicable(o.gstApplicable);
+          if (typeof o.tdsApplicable === 'boolean') setTdsApplicable(o.tdsApplicable);
+          if (Array.isArray(o.incomeSources) && o.incomeSources.length) setIncomeSources(o.incomeSources);
+          if (o.taxPeriod) setTaxPeriod(o.taxPeriod);
+          if (typeof o.step === 'number') setStep(Math.min(o.step, STEPS.length - 1));
+          return;
+        }
+      } catch {}
+      const local = getWorkspace();
+      if (local) {
+        setUserType(local.userType); setBusinessName(local.businessName);
+        setBusinessType(local.businessType); setGstApplicable(local.gstApplicable);
+        setTdsApplicable(local.tdsApplicable); setIncomeSources(local.incomeSources);
+        setTaxPeriod(local.taxPeriod);
+      }
+    })();
+  }, []);
 
-  const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  const persist = async (partial: any = {}) => {
+    const profile: any = {
+      userType, businessName, businessType, gstApplicable, tdsApplicable,
+      incomeSources, taxPeriod, ...partial,
+    };
+    try { await api.putOnboarding?.(profile); } catch {}
+    saveWorkspace({ ...profile, completedAt: profile.completedAt || new Date().toISOString() });
+  };
+
+  const toggleSource = (v: string) => {
+    setIncomeSources((s) => {
+      const next = s.includes(v) ? s.filter((x) => x !== v) : [...s, v];
+      persist({ incomeSources: next });
+      return next;
+    });
+  };
+
+  const next = () => {
+    const ns = Math.min(step + 1, STEPS.length - 1);
+    setStep(ns);
+    persist({ step: ns });
+  };
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const finish = () => {
@@ -35,10 +82,8 @@ export default function OnboardingPage() {
       toast.error('Pick at least one income source');
       return;
     }
-    saveWorkspace({
-      userType, businessName, businessType, gstApplicable, tdsApplicable,
-      incomeSources, taxPeriod, completedAt: new Date().toISOString(),
-    });
+    const done = new Date().toISOString();
+    persist({ completedAt: done });
     toast.success('Workspace ready');
     router.push('/dashboard');
   };

@@ -9,6 +9,7 @@ from app.request_context import RequestContextMiddleware
 from app.api import router as api_router
 from app.saas_api import router as saas_router
 from app.commerce_api import router as commerce_router
+from app.practice_api import router as practice_router
 
 
 @asynccontextmanager
@@ -64,6 +65,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.include_router(api_router, prefix="/api")
 app.include_router(saas_router, prefix="/api")
 app.include_router(commerce_router, prefix="/api")
+app.include_router(practice_router, prefix="/api")
 
 
 @app.get("/")

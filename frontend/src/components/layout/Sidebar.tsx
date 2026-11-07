@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -28,14 +29,15 @@ import {
   Bell,
   Search,
   LifeBuoy,
+  UserCheck,
 } from 'lucide-react';
-import { getWorkspace, visibleModules } from '@/lib/workspace';
+import { getWorkspace, saveWorkspace, visibleModules, UserType } from '@/lib/workspace';
 
 interface NavItem {
   name: string;
   href: string;
   icon: any;
-  module?: string;
+  badge?: string;
 }
 
 interface NavGroup {
@@ -43,105 +45,186 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const GROUPS: NavGroup[] = [
-  { label: 'Home', items: [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Onboarding', href: '/onboarding', icon: Sparkles },
-    { name: 'Search', href: '/search', icon: Search },
-    { name: 'Notifications', href: '/notifications', icon: Bell },
-  ]},
-  { label: 'Money', items: [
-    { name: 'Transactions', href: '/transactions', icon: CreditCard },
-    { name: 'Banking', href: '/banking', icon: Landmark },
-    { name: 'Customers', href: '/customers', icon: Users },
-    { name: 'Vendors', href: '/vendors', icon: UserRound },
-    { name: 'Receivables', href: '/receivables', icon: FileText },
-    { name: 'Payables', href: '/payables', icon: Receipt },
-  ]},
-  { label: 'Sell', items: [
-    { name: 'Invoices', href: '/invoices', icon: FileText },
-    { name: 'POS', href: '/pos', icon: ShoppingCart, module: 'pos' },
-  ]},
-  { label: 'Accounting', items: [
-    { name: 'Books', href: '/accounting', icon: BookOpen },
-  ]},
-  { label: 'Tax', items: [
-    { name: 'Income Tax', href: '/tax', icon: Scale },
-    { name: 'AIS / 26AS', href: '/ais', icon: Sheet },
-    { name: 'GST', href: '/gst', icon: Receipt, module: 'gst' },
-    { name: 'TDS', href: '/tds', icon: Droplets, module: 'tds' },
-  ]},
-  { label: 'Compliance', items: [
-    { name: 'Compliance', href: '/compliance', icon: ShieldCheck },
-    { name: 'Month-End', href: '/close', icon: ClipboardCheck },
-    { name: 'Obligations', href: '/obligations', icon: ShieldCheck },
-    { name: 'Deadlines', href: '/deadlines', icon: ClipboardCheck },
-  ]},
-  { label: 'Manage', items: [
-    { name: 'Documents', href: '/documents', icon: FolderOpen },
-    { name: 'Reports', href: '/reports', icon: LineChart },
-    { name: 'Intelligence', href: '/intelligence', icon: Sparkles },
-    { name: 'Inventory', href: '/inventory', icon: Boxes, module: 'inventory' },
-    { name: 'Scenarios', href: '/scenarios', icon: LineChart },
-    { name: 'Assistant', href: '/assistant', icon: MessageCircle },
-    { name: 'Billing', href: '/billing', icon: CreditCard },
-    { name: 'Support', href: '/support', icon: LifeBuoy },
-    { name: 'Practice', href: '/practice', icon: Briefcase, module: 'practice' },
-    { name: 'Admin', href: '/admin', icon: ShieldCheck },
-    { name: 'Settings', href: '/settings', icon: Settings },
-  ]},
+const PRACTICE_GROUPS: NavGroup[] = [
+  {
+    label: 'Practice Management',
+    items: [
+      { name: 'Practice Overview', href: '/practice', icon: LayoutDashboard },
+      { name: 'Practice Setup', href: '/practice/setup', icon: Sparkles },
+      { name: 'Client Master 360°', href: '/practice/clients', icon: Users },
+      { name: 'Leads & CRM', href: '/practice/crm', icon: UserRound },
+      { name: 'Engagements', href: '/practice/engagements', icon: FileText },
+    ],
+  },
+  {
+    label: 'Work Management',
+    items: [
+      { name: 'All Tasks (12 Stages)', href: '/practice/tasks', icon: ClipboardCheck },
+      { name: 'Team Workload', href: '/practice/team', icon: Users },
+      { name: 'Review Queue', href: '/practice/reviews', icon: ShieldCheck, badge: 'SQC-1' },
+      { name: 'Audit Workpapers', href: '/practice/workpapers', icon: BookOpen, badge: 'SA 230' },
+    ],
+  },
+  {
+    label: 'Compliance Desks',
+    items: [
+      { name: 'GST Practice Desk', href: '/practice/gst', icon: Receipt, badge: '8-Way' },
+      { name: 'TDS Practice Desk', href: '/practice/tds', icon: Droplets },
+      { name: 'Income Tax Desk', href: '/practice/tax', icon: Scale },
+      { name: 'UDIN Tracker', href: '/practice/udin', icon: ShieldCheck, badge: 'ICAI' },
+      { name: 'Compliance Calendar', href: '/practice/calendar', icon: ClipboardCheck },
+    ],
+  },
+  {
+    label: 'Practice Finance',
+    items: [
+      { name: 'Fee & Billing', href: '/practice/finance', icon: CreditCard },
+    ],
+  },
+  {
+    label: 'Client Portal',
+    items: [
+      { name: 'Client Portal View', href: '/portal', icon: Landmark },
+    ],
+  },
+  {
+    label: 'Client Accounting',
+    items: [
+      { name: 'Books & Ledger', href: '/accounting', icon: BookOpen },
+      { name: 'Invoices & Sell', href: '/invoices', icon: FileText },
+      { name: 'Banking', href: '/banking', icon: Landmark },
+      { name: 'Transactions', href: '/transactions', icon: CreditCard },
+      { name: 'AIS / Form 26AS', href: '/ais', icon: Sheet },
+      { name: 'Month-End Close', href: '/close', icon: ClipboardCheck },
+    ],
+  },
+  {
+    label: 'Intelligence & Settings',
+    items: [
+      { name: 'CA Assistant', href: '/assistant', icon: MessageCircle, badge: 'AI' },
+      { name: 'Reports & Analytics', href: '/reports', icon: LineChart },
+      { name: 'Documents Vault', href: '/documents', icon: FolderOpen },
+      { name: 'Notifications', href: '/notifications', icon: Bell },
+      { name: 'Firm Settings', href: '/settings', icon: Settings },
+    ],
+  },
+];
+
+const PERSONA_OPTIONS: { id: UserType; label: string }[] = [
+  { id: 'ca_partner', label: 'Persona: CA Partner / Firm Owner' },
+  { id: 'ca', label: 'Persona: Solo Practicing CA' },
+  { id: 'accountant', label: 'Persona: Small Accounting Firm' },
+  { id: 'gst_specialist', label: 'Persona: GST Specialist' },
+  { id: 'tax_specialist', label: 'Persona: Direct Tax Specialist' },
+  { id: 'audit_staff', label: 'Persona: Audit Staff (SA 230)' },
+  { id: 'client', label: 'Persona: Client Portal (SME Owner)' },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const profile = typeof window !== 'undefined' ? getWorkspace() : null;
-  const visible = visibleModules(profile?.userType);
+  const [activePersona, setActivePersona] = useState<UserType>('ca_partner');
+
+  useEffect(() => {
+    const ws = getWorkspace();
+    if (ws?.userType) {
+      setActivePersona(ws.userType);
+    }
+  }, []);
+
+  const handlePersonaChange = (type: UserType) => {
+    setActivePersona(type);
+    const existing = getWorkspace() || {
+      businessName: 'Kailash & Associates, CAs',
+      businessType: 'partnership',
+      gstApplicable: true,
+      tdsApplicable: true,
+      incomeSources: ['Profession', 'Audit'],
+      taxPeriod: '2024-25',
+      completedAt: new Date().toISOString(),
+      userType: type,
+    };
+    saveWorkspace({ ...existing, userType: type });
+  };
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 hidden lg:block" aria-label="Primary">
+    <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-200 border-r border-slate-800 hidden lg:block" aria-label="Primary">
       <div className="flex flex-col h-full">
-        <div className="flex items-center h-16 px-6 border-b border-gray-100">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <ShieldCheck className="h-8 w-8 text-primary-600" aria-hidden="true" />
-            <span className="text-xl font-bold text-gray-900">Tax Shield</span>
+        {/* Brand Header */}
+        <div className="flex items-center justify-between h-16 px-5 border-b border-slate-800 bg-slate-950/40">
+          <Link href="/practice" className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="text-base font-bold text-white tracking-tight">TaxShield</span>
+              <span className="block text-[10px] font-semibold text-emerald-400 tracking-wider uppercase">Professional</span>
+            </div>
           </Link>
         </div>
-        <nav className="flex-1 px-4 py-4 space-y-4 overflow-y-auto" aria-label="Main navigation">
-          {GROUPS.map((group) => {
-            const items = group.items.filter((i) => !i.module || visible.has(i.module));
-            if (items.length === 0) return null;
-            return (
-              <div key={group.label}>
-                <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  {group.label}
-                </p>
-                <div className="space-y-1">
-                  {items.map((item) => {
-                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                    return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className={cn(
-                          'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                          isActive
-                            ? 'bg-primary-50 text-primary-700'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                        )}
-                        aria-current={isActive ? 'page' : undefined}
-                      >
-                        <item.icon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
-                        {item.name}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+
+        {/* Persona Switcher Selector */}
+        <div className="px-4 py-3 bg-slate-950/60 border-b border-slate-800/80">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-1.5 flex items-center gap-1">
+            <UserCheck className="h-3 w-3 text-emerald-400" />
+            Active Role Persona
+          </label>
+          <select
+            value={activePersona}
+            onChange={(e) => handlePersonaChange(e.target.value as UserType)}
+            className="w-full text-xs bg-slate-800 text-slate-200 border border-slate-700 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          >
+            {PERSONA_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Nav Links */}
+        <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto" aria-label="Main navigation">
+          {PRACTICE_GROUPS.map((group) => (
+            <div key={group.label} className="space-y-1">
+              <p className="px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                {group.label}
+              </p>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href || (item.href !== '/practice' && item.href !== '/dashboard' && pathname?.startsWith(item.href));
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center justify-between px-3 py-2 text-xs font-medium rounded-md transition-colors',
+                      isActive
+                        ? 'bg-emerald-500/15 text-emerald-400 font-semibold'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-emerald-400' : 'text-slate-400')} />
+                      <span>{item.name}</span>
+                    </div>
+                    {item.badge && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
-        <div className="p-4 border-t border-gray-100">
-          <p className="text-xs text-gray-500 text-center">Tax Shield · Financial OS</p>
+
+        {/* Footer Status */}
+        <div className="p-3 border-t border-slate-800 bg-slate-950/40 text-[11px] text-slate-400 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-medium text-slate-300">Practice OS Online</span>
+          </div>
+          <span className="text-[10px] text-slate-500">v2.0-IN</span>
         </div>
       </div>
     </aside>

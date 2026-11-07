@@ -174,6 +174,31 @@ async def update_me(body: dict, request: Request,
     return {"message": "Profile updated", "updated": updated_fields}
 
 
+@router.get("/onboarding")
+async def get_onboarding(current_user: User = Depends(get_current_active_user)):
+    """Return the server-persisted workspace/onboarding profile (authoritative)."""
+    db = await get_database()
+    doc = await db.users.find_one({"_id": current_user.id}, {"onboarding": 1})
+    return {"onboarding": (doc or {}).get("onboarding")}
+
+
+@router.put("/onboarding")
+async def put_onboarding(body: dict, request: Request,
+                         current_user: User = Depends(get_current_active_user)):
+    """Persist workspace/onboarding profile server-side. Survives refresh, logout, device change."""
+    allowed = {"userType", "businessName", "businessType", "gstApplicable",
+               "tdsApplicable", "incomeSources", "taxPeriod", "completedAt", "step"}
+    profile = {k: v for k, v in body.items() if k in allowed}
+    if "incomeSources" in profile and not isinstance(profile["incomeSources"], list):
+        raise HTTPException(status_code=422, detail="incomeSources must be a list")
+    db = await get_database()
+    await db.users.update_one({"_id": current_user.id},
+                              {"$set": {"onboarding": profile, "updated_at": datetime.utcnow()}})
+    await log_event("ONBOARDING_SAVED", user_id=current_user.id,
+                    meta={"fields": sorted(profile.keys())}, request_id=_rid(request))
+    return {"message": "Onboarding saved", "onboarding": profile}
+
+
 # ---------------- billing ----------------
 
 @router.get("/billing/plans")
