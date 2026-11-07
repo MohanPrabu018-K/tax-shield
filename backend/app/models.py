@@ -90,6 +90,10 @@ class User(UserBase):
     # Commercial identity: JWT version binding (logout-all) + admin console.
     token_version: int = 0
     is_admin: bool = False
+    mfa_enabled: bool = False
+    mfa_secret: Optional[str] = None
+    mfa_pending_secret: Optional[str] = None
+    mfa_recovery_codes: Optional[list[str]] = None
     deletion_status: Optional[str] = None
     deletion_requested_at: Optional[datetime] = None
     deletion_grace_until: Optional[datetime] = None
@@ -108,6 +112,8 @@ class UserInDB(User):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    mfa_required: Optional[bool] = False
+    mfa_ticket: Optional[str] = None
 
 
 class TokenData(BaseModel):

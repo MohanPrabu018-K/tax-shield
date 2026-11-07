@@ -116,6 +116,19 @@ async def login(request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    # If user has MFA enabled, return challenge ticket instead of final JWT token
+    if getattr(user, "mfa_enabled", False):
+        from app.mfa import create_mfa_ticket
+        ticket = create_mfa_ticket(str(user.id), user.email)
+        await log_event("LOGIN_MFA_CHALLENGE", user_id=user.id,
+                        request_id=getattr(getattr(request, "state", None), "request_id", None))
+        return {
+            "access_token": "",
+            "token_type": "bearer",
+            "mfa_required": True,
+            "mfa_ticket": ticket,
+        }
+
     access_token = token_for_user(user)
     await log_event("LOGIN", user_id=user.id,
                     request_id=getattr(getattr(request, "state", None), "request_id", None))

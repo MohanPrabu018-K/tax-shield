@@ -11,9 +11,12 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function registerUser(page: Page, name: string, email: string, userType: string = 'other') {
+  const uniqueEmail = email.includes('@')
+    ? email.replace('@', `+${Date.now()}-${Math.random().toString(36).slice(2, 6)}@`)
+    : email;
   await gotoHydrated(page, '/register');
   await fillStable(page.getByLabel(/full name/i), name);
-  await fillStable(page.getByLabel(/email/i), email);
+  await fillStable(page.getByLabel(/email/i), uniqueEmail);
   await fillStable(page.getByLabel(/^password/i).first(), 'Password123!');
   await fillStable(page.getByLabel(/confirm/i), 'Password123!');
   const et = page.getByLabel(/employment type/i);

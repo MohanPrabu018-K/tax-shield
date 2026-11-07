@@ -722,3 +722,88 @@ async def get_portal_dashboard(current_user: User = Depends(get_current_active_u
         "open_invoices": [doc(i) for i in invoices],
     }
 
+
+# ---------------------------------------------------------------------------
+# 13. Tally Prime XML Migration & Interoperability
+# ---------------------------------------------------------------------------
+
+@router.post("/practice/migration/tally/preview")
+async def preview_tally_xml(body: dict, current_user: User = Depends(get_current_active_user)):
+    """Preview a Tally Prime XML export before committing import."""
+    xml_content = body.get("xml_content", "")
+    if not xml_content.strip():
+        raise HTTPException(status_code=400, detail="XML content cannot be empty")
+
+    from app.tally_import import parse_tally_xml_masters, parse_tally_xml_vouchers
+    try:
+        ledgers = parse_tally_xml_masters(xml_content)
+        vouchers, warnings = parse_tally_xml_vouchers(xml_content)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Failed to parse Tally XML: {str(e)}")
+
+    valid_vouchers = [v for v in vouchers if v["is_balanced"] and not v["is_duplicate"]]
+    duplicates = [v for v in vouchers if v["is_duplicate"]]
+    unbalanced = [v for v in vouchers if not v["is_balanced"]]
+
+    return {
+        "ledgers_found": len(ledgers),
+        "vouchers_found": len(vouchers),
+        "valid_vouchers_count": len(valid_vouchers),
+        "duplicate_count": len(duplicates),
+        "unbalanced_count": len(unbalanced),
+        "warnings": warnings,
+        "sample_ledgers": ledgers[:5],
+        "preview_vouchers": vouchers[:10],
+    }
+
+
+@router.post("/practice/migration/tally/import")
+async def import_tally_xml(body: dict, current_user: User = Depends(get_current_active_user)):
+    """Import valid Tally Prime XML vouchers and masters for a specific client."""
+    client_id = body.get("client_id")
+    xml_content = body.get("xml_content", "")
+    if not client_id or not xml_content.strip():
+        raise HTTPException(status_code=400, detail="client_id and xml_content are required")
+
+    from app.tally_import import parse_tally_xml_masters, parse_tally_xml_vouchers
+    try:
+        ledgers = parse_tally_xml_masters(xml_content)
+        vouchers, warnings = parse_tally_xml_vouchers(xml_content)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Failed to parse Tally XML: {str(e)}")
+
+    valid_vouchers = [v for v in vouchers if v["is_balanced"] and not v["is_duplicate"]]
+    if not valid_vouchers and not ledgers:
+        return {"message": "No valid vouchers or ledgers to import", "imported_count": 0}
+
+    db = await get_database()
+    inserted_count = 0
+    now = datetime.now(timezone.utc)
+
+    for v in valid_vouchers:
+        rec = {
+            "user_id": current_user.id,
+            "client_id": client_id,
+            "source": "tally_xml_import",
+            "voucher_type": v["voucher_type"],
+            "voucher_number": v["voucher_number"],
+            "date": v["date"],
+            "narration": v["narration"],
+            "entries": v["entries"],
+            "amount": v["total_debit"],
+            "created_at": now,
+        }
+        await db.journals.insert_one(rec)
+        inserted_count += 1
+
+    await log_event("TALLY_XML_IMPORTED", user_id=str(current_user.id),
+                    meta={"client_id": client_id, "count": inserted_count, "warnings": len(warnings)})
+
+    return {
+        "message": f"Successfully imported {inserted_count} vouchers from Tally Prime.",
+        "imported_count": inserted_count,
+        "skipped_duplicates": len([v for v in vouchers if v["is_duplicate"]]),
+        "warnings": warnings,
+    }
+
+

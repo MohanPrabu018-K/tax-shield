@@ -24,7 +24,7 @@ export default function AdminPage() {
     setForbidden(false);
     try {
       
-      if (v === 'overview') setData(await api.getAdminOverview()); else if (v === 'users') setData(await api.getAdminUsers()); else if (v === 'subscriptions') setData(await api.getAdminSubscriptions()); else if (v === 'support') setData(await api.getAdminSupport()); else if (v === 'audit') setData(await api.getAdminAudit()); else if (v === 'health') setData(await api.getAdminHealth()); else if (v === 'incidents') setData(await api.getAdminIncidents());
+      if (v === 'overview') setData(await api.getAdminOverview()); else if (v === 'pilot') setData(await api.getPilotCohort()); else if (v === 'feedback') setData(await api.getAdminFeedback()); else if (v === 'users') setData(await api.getAdminUsers()); else if (v === 'subscriptions') setData(await api.getAdminSubscriptions()); else if (v === 'support') setData(await api.getAdminSupport()); else if (v === 'audit') setData(await api.getAdminAudit()); else if (v === 'health') setData(await api.getAdminHealth()); else if (v === 'incidents') setData(await api.getAdminIncidents());
     } catch (e: any) {
       if (e?.response?.status === 403) setForbidden(true);
       else toast.error('Admin load failed');
@@ -46,6 +46,16 @@ export default function AdminPage() {
       load('users');
     } catch {
       toast.error('Update failed');
+    }
+  };
+
+  const updatePilotStatus = async (firmId: string, status: string) => {
+    try {
+      await api.patchPilotCohort(firmId, { status });
+      toast.success('Pilot firm status updated');
+      load('pilot');
+    } catch {
+      toast.error('Failed to update status');
     }
   };
 
@@ -89,7 +99,7 @@ export default function AdminPage() {
     );
   }
 
-  const tabs = ['overview', 'users', 'subscriptions', 'support', 'audit', 'health', 'incidents'];
+  const tabs = ['overview', 'pilot', 'feedback', 'users', 'subscriptions', 'support', 'audit', 'health', 'incidents'];
 
   return (
     <DashboardLayout>
@@ -118,6 +128,110 @@ export default function AdminPage() {
                     <p className="text-xl font-bold">{String(v)}</p>
                   </CardContent></Card>
                 ))}
+              </div>
+            )}
+            {view === 'pilot' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card><CardContent>
+                    <p className="text-xs uppercase text-gray-500">Total Pilot Firms</p>
+                    <p className="text-2xl font-bold text-primary-700">{data.total_firms || 0} / 10 Target</p>
+                  </CardContent></Card>
+                  {Object.entries(data.status_distribution || {}).slice(0, 3).map(([st, cnt]) => (
+                    <Card key={st}><CardContent>
+                      <p className="text-xs uppercase text-gray-500">{st.replace('_', ' ')}</p>
+                      <p className="text-2xl font-bold">{String(cnt)}</p>
+                    </CardContent></Card>
+                  ))}
+                </div>
+
+                <Card><CardContent className="p-0">
+                  <Table><TableHeader><TableRow>
+                    <TableHead>Firm Name</TableHead>
+                    <TableHead>Type & City</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Users / Clients</TableHead>
+                    <TableHead>Tasks Done</TableHead>
+                    <TableHead>Change Status</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {(!data.cohort || data.cohort.length === 0) ? (
+                      <TableRow><TableCell colSpan={7} className="text-center py-6 text-gray-500">No pilot firms enrolled yet. Share /pilot/register to invite firms.</TableCell></TableRow>
+                    ) : (
+                      data.cohort.map((f: any) => (
+                        <TableRow key={f.id}>
+                          <TableCell className="font-semibold text-gray-900">{f.firm_name}</TableCell>
+                          <TableCell><span className="capitalize">{f.firm_type?.replace('_', ' ')}</span> • {f.office_location}</TableCell>
+                          <TableCell>{f.contact_name}<br/><span className="text-xs text-gray-500">{f.email}</span></TableCell>
+                          <TableCell>
+                            <Badge variant={f.pilot_status === 'ACTIVE' ? 'success' : f.pilot_status === 'ONBOARDING' ? 'info' : 'warning'}>
+                              {f.pilot_status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{f.active_users} staff / {f.client_users} clients</TableCell>
+                          <TableCell>{f.tasks_completed}</TableCell>
+                          <TableCell>
+                            <select
+                              value={f.pilot_status}
+                              onChange={(e) => updatePilotStatus(f.id, e.target.value)}
+                              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+                            >
+                              {['INVITED', 'CONTACTED', 'CONSENT_PENDING', 'ONBOARDING', 'ACTIVE', 'PAUSED', 'COMPLETED', 'WITHDRAWN'].map((st) => (
+                                <option key={st} value={st}>{st}</option>
+                              ))}
+                            </select>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody></Table>
+                </CardContent></Card>
+              </div>
+            )}
+            {view === 'feedback' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card><CardContent>
+                    <p className="text-xs uppercase text-gray-500">Total Feedback</p>
+                    <p className="text-2xl font-bold">{data.total_feedback_count || 0}</p>
+                  </CardContent></Card>
+                  <Card><CardContent>
+                    <p className="text-xs uppercase text-gray-500">Average Rating</p>
+                    <p className="text-2xl font-bold text-amber-600">★ {data.average_rating || 0} / 5.0</p>
+                  </CardContent></Card>
+                </div>
+
+                <Card><CardContent className="p-0">
+                  <Table><TableHeader><TableRow>
+                    <TableHead>Workflow</TableHead>
+                    <TableHead>User / Role</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead>Outcome</TableHead>
+                    <TableHead>Confusion / Friction</TableHead>
+                    <TableHead>Suggestions</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {(!data.entries || data.entries.length === 0) ? (
+                      <TableRow><TableCell colSpan={6} className="text-center py-6 text-gray-500">No customer feedback submitted yet.</TableCell></TableRow>
+                    ) : (
+                      data.entries.map((fb: any) => (
+                        <TableRow key={fb.id}>
+                          <TableCell className="font-semibold capitalize">{fb.workflow_type?.replace('_', ' ')}</TableCell>
+                          <TableCell>{fb.user_email}<br/><span className="text-xs text-gray-400 capitalize">{fb.user_role}</span></TableCell>
+                          <TableCell><span className="text-amber-600 font-bold">★ {fb.rating}</span></TableCell>
+                          <TableCell>
+                            <Badge variant={fb.completed_successfully ? 'success' : 'danger'}>
+                              {fb.completed_successfully ? 'Completed' : 'Blocked'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs max-w-xs">{fb.confusion_notes || '—'}</TableCell>
+                          <TableCell className="text-xs max-w-xs">{fb.improvement_suggestions || '—'}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody></Table>
+                </CardContent></Card>
               </div>
             )}
             {view === 'users' && (

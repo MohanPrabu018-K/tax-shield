@@ -81,6 +81,31 @@ class ApiClient {
     return normalize(response.data);
   }
 
+  async getMfaStatus() {
+    const response = await this.client.get('/auth/mfa/status');
+    return normalize(response.data);
+  }
+
+  async setupMfa() {
+    const response = await this.client.post('/auth/mfa/setup');
+    return normalize(response.data);
+  }
+
+  async enableMfa(code: string) {
+    const response = await this.client.post('/auth/mfa/enable', { code });
+    return normalize(response.data);
+  }
+
+  async verifyMfa(mfa_ticket: string, code?: string, recovery_code?: string) {
+    const response = await this.client.post('/auth/mfa/verify', { mfa_ticket, code, recovery_code });
+    return normalize(response.data);
+  }
+
+  async disableMfa(password: string, code?: string, recovery_code?: string) {
+    const response = await this.client.post('/auth/mfa/disable', { password, code, recovery_code });
+    return normalize(response.data);
+  }
+
   async register(data: { email: string; password: string; name: string }) {
     const response = await this.client.post('/register', data);
     return normalize(response.data);
@@ -914,6 +939,41 @@ class ApiClient {
 
   async getPortalDashboard() {
     const response = await this.client.get('/portal/dashboard');
+    return normalize(response.data);
+  }
+
+  async getPilotCohort() {
+    const response = await this.client.get('/admin/pilot/cohort');
+    return normalize(response.data);
+  }
+
+  async patchPilotCohort(firmId: string, data: any) {
+    const response = await this.client.patch(`/admin/pilot/cohort/${firmId}`, data);
+    return normalize(response.data);
+  }
+
+  async registerPilotFirm(data: any) {
+    const response = await this.client.post('/pilot/register', data);
+    return normalize(response.data);
+  }
+
+  async submitFeedback(data: any) {
+    const response = await this.client.post('/feedback', data);
+    return normalize(response.data);
+  }
+
+  async getAdminFeedback() {
+    const response = await this.client.get('/admin/pilot/feedback');
+    return normalize(response.data);
+  }
+
+  async previewTallyXml(xmlContent: string) {
+    const response = await this.client.post('/practice/migration/tally/preview', { xml_content: xmlContent });
+    return normalize(response.data);
+  }
+
+  async importTallyXml(clientId: string, xmlContent: string) {
+    const response = await this.client.post('/practice/migration/tally/import', { client_id: clientId, xml_content: xmlContent });
     return normalize(response.data);
   }
 

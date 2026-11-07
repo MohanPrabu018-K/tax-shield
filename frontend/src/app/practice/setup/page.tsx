@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Check, ChevronRight, ChevronLeft, Building2, UserCheck, ShieldCheck, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { MfaSettingsCard } from '@/components/security/MfaSettingsCard';
 
 export default function PracticeSetupWizardPage() {
   const router = useRouter();
@@ -307,6 +308,10 @@ export default function PracticeSetupWizardPage() {
             </div>
           </CardContent>
         </Card>
+
+        <div className="mt-8">
+          <MfaSettingsCard />
+        </div>
       </div>
     </DashboardLayout>
   );

@@ -10,6 +10,8 @@ from app.api import router as api_router
 from app.saas_api import router as saas_router
 from app.commerce_api import router as commerce_router
 from app.practice_api import router as practice_router
+from app.mfa_api import router as mfa_router
+from app.pilot_api import router as pilot_router
 
 
 @asynccontextmanager
@@ -66,6 +68,8 @@ app.include_router(api_router, prefix="/api")
 app.include_router(saas_router, prefix="/api")
 app.include_router(commerce_router, prefix="/api")
 app.include_router(practice_router, prefix="/api")
+app.include_router(mfa_router)
+app.include_router(pilot_router)
 
 
 @app.get("/")
