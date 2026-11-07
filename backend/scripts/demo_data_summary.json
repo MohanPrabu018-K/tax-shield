@@ -1,0 +1,11 @@
+{
+  "practice_name": "Vanguard Advisory & Associates CA [Synthetic Demo Firm]",
+  "owner_email": "vikram.malhotra.demo@vanguard-ca.example.com",
+  "demo_password": "DemoPassword2026!",
+  "team_size": 5,
+  "clients_count": 5,
+  "tasks_count": 5,
+  "workpapers_count": 2,
+  "invoices_count": 2,
+  "doc_requests_count": 2
+}

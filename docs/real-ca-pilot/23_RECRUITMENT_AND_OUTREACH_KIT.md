@@ -159,7 +159,30 @@ The recruitment program aims to onboard **10 genuine Indian Chartered Accountant
 
 ---
 
-## 6. 15-MINUTE LIVE DEMO SCRIPT FOR CA PARTNERS
+## 6. SYNTHETIC-DATA DEMONSTRATION INVITATION & ZERO-RISK GUARANTEE
+
+Before any firm commits to onboarding, we invite CA partners to experience an interactive, 15-minute walkthrough conducted **100% on synthetic data**:
+- **Zero Real Client Exposure:** You do not need to share, upload, or expose any authentic client documents or taxpayer credentials to view the platform.
+- **Realistic Practice Simulation:** The demonstration utilizes a pre-seeded synthetic CA practice (`Vanguard Advisory & Associates CA`) with 5 realistic client entities representing logistics, retail, healthcare (Section 44ADA), manufacturing (blocked ITC Section 17(5)), and IT services.
+- **Hands-On Experience:** Partners can independently test the mobile Client Portal, Tally Prime XML import, and GSTR-2B 8-way reconciliation in real-time.
+
+---
+
+## 7. CONTACT, SCHEDULING & FOLLOW-UP PROCESS
+
+To ensure professional, non-intrusive communication adhering to ICAI norms:
+1. **Initial Outreach:** Delivered exclusively via personalized one-on-one email or verified professional LinkedIn InMail.
+2. **Scheduling Window:** Walkthroughs are offered in flexible 15-minute morning or evening slots to accommodate CA firm filing schedules.
+3. **Designated Point of Contact:**
+   - **Pilot Coordinator:** Customer Success Team (`pilot@taxshield.internal`)
+   - **Technical Liaison:** Principal Solutions Architect
+   - **Direct Calendar Link:** `https://taxshield.internal/demo/schedule`
+4. **Follow-Up SLA:** A single follow-up message is permitted 4 business days after initial contact. If no interest is expressed, the prospect is marked 'Declined' in the tracker, and no further outreach is initiated.
+5. **Ethical Hold:** No automated drip campaigns, mass blasts, or unsolicited telephone calls are permitted.
+
+---
+
+## 8. 15-MINUTE LIVE DEMO SCRIPT FOR CA PARTNERS
 
 ```
 [00:00 - 02:00] INTRO & PRACTICE DISCOVERY
@@ -189,3 +212,4 @@ The recruitment program aims to onboard **10 genuine Indian Chartered Accountant
 - Invite Managing Partner to activate workspace at /pilot/register.
 - Answer questions on data migration and staff training.
 ```
+

@@ -16,10 +16,14 @@ class Settings(BaseSettings):
     ADMIN_EMAILS: str = "ca.admin@example.com,admin@taxshield.internal"
     # Password policy
     MIN_PASSWORD_LEN: int = 8
+    # Pilot environment & backup seal
+    BACKUP_SEAL_SECRET: str | None = None
+    ZERO_COST_POLICY: str = "ENFORCED"
 
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 
 settings = Settings()

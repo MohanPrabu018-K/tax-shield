@@ -1,0 +1,259 @@
+{
+  "audit_timestamp": "2026-11-07T12:44:49.490626+00:00",
+  "target_release": "TaxShield Professional v1.2.0",
+  "demo_a_solo_ca": {
+    "steps": [
+      {
+        "step": 1,
+        "title": "Firm Onboarding & Solo Practice Setup",
+        "status": "PASS",
+        "evidence": {
+          "frn": "018156S",
+          "status_code": 200
+        }
+      },
+      {
+        "step": 2,
+        "title": "RFC 6238 TOTP Multi-Factor Authentication Hardening",
+        "status": "PASS",
+        "evidence": {
+          "mfa_enabled": true,
+          "recovery_codes": 8
+        }
+      },
+      {
+        "step": 3,
+        "title": "Client Master 360\u00b0 Profile Initialization",
+        "status": "PASS",
+        "evidence": {
+          "client_id": "6aef1d42573350bb68e6774a",
+          "entity_type": "pvt_ltd",
+          "pan": "AAACR1234R"
+        }
+      },
+      {
+        "step": 4,
+        "title": "Client Document Request & Portal Delivery Verification",
+        "status": "PASS",
+        "evidence": {
+          "pending_documents_count": 1
+        }
+      },
+      {
+        "step": 5,
+        "title": "Automated 8-Way GSTR-2B Reconciliation Desk",
+        "status": "PASS",
+        "evidence": {
+          "matched_invoices": 1,
+          "missing_in_portal": 1
+        }
+      },
+      {
+        "step": 6,
+        "title": "TDS Scrutiny & Deterministic Slabs Validation",
+        "status": "PASS",
+        "evidence": {
+          "taxable_income": 800000,
+          "base_tax": 45000.0,
+          "cess": 1800.0
+        }
+      },
+      {
+        "step": 7,
+        "title": "Section 115BAC Comparative Regime Computation",
+        "status": "PASS",
+        "evidence": {
+          "income": 1200000,
+          "new_regime_tax": 93600.0,
+          "old_regime_tax": 119600.0,
+          "tax_savings": 26000.0
+        }
+      },
+      {
+        "step": 8,
+        "title": "Accounting Reports & Statutory GST Invoice Generation",
+        "status": "PASS",
+        "evidence": {
+          "invoice_number": "INV-2026-27-0001",
+          "taxable": 40000.0,
+          "gst_18": 7200.0,
+          "total": 47200.0
+        }
+      },
+      {
+        "step": 9,
+        "title": "12-State Task Lifecycle & Review Approval",
+        "status": "PASS",
+        "evidence": {
+          "task_id": "6aef1d43573350bb68e67779",
+          "final_status": "APPROVED"
+        }
+      },
+      {
+        "step": 10,
+        "title": "Client Portal Delivery & Live Dashboard View",
+        "status": "PASS",
+        "evidence": {
+          "compliance_summary": {
+            "gst": "GSTR-1 Filed | GSTR-3B Under Review",
+            "tds": "Q2 Deposited",
+            "income_tax": "Data collection 90%"
+          }
+        }
+      }
+    ],
+    "pass_count": 10,
+    "fail_count": 0
+  },
+  "demo_b_gst_practice": {
+    "steps": [
+      {
+        "step": 1,
+        "title": "GST Practice Dashboard & Attention Center Triage",
+        "status": "PASS",
+        "evidence": {
+          "practice_kpis": {
+            "total_clients": 0,
+            "active_clients": 0,
+            "open_tasks": 0,
+            "overdue_tasks": 0,
+            "pending_reviews": 0,
+            "pending_documents": 0,
+            "total_billed": 0.0,
+            "total_collected": 0.0,
+            "total_outstanding": 0.0
+          }
+        }
+      },
+      {
+        "step": 2,
+        "title": "Multiple GST Client Management & Multi-GSTIN Tracking",
+        "status": "PASS",
+        "evidence": {
+          "total_gst_clients": 2
+        }
+      },
+      {
+        "step": 3,
+        "title": "Tally Prime XML Masters & Journal Import Preview",
+        "status": "PASS",
+        "evidence": {
+          "ledgers_found": 2,
+          "vouchers_found": 1,
+          "valid_vouchers_count": 1,
+          "duplicate_count": 0,
+          "unbalanced_count": 0,
+          "warnings": [],
+          "sample_ledgers": [
+            {
+              "name": "GST Input CGST",
+              "tally_parent": "Duties and Taxes",
+              "account_type": "asset",
+              "opening_balance": 0.0,
+              "balance_type": "debit"
+            },
+            {
+              "name": "GST Input SGST",
+              "tally_parent": "Duties and Taxes",
+              "account_type": "asset",
+              "opening_balance": 0.0,
+              "balance_type": "debit"
+            }
+          ],
+          "preview_vouchers": [
+            {
+              "voucher_type": "Purchase",
+              "voucher_number": "PUR-GST-001",
+              "date": "2026-10-25",
+              "narration": "Raw material purchase under GST",
+              "entries": [
+                {
+                  "ledger_name": "GST Input CGST",
+                  "debit": 0.0,
+                  "credit": 9000.0
+                },
+                {
+                  "ledger_name": "GST Input SGST",
+                  "debit": 9000.0,
+                  "credit": 0.0
+                }
+              ],
+              "total_debit": 9000.0,
+              "total_credit": 9000.0,
+              "is_balanced": true,
+              "is_duplicate": false
+            }
+          ]
+        }
+      },
+      {
+        "step": 4,
+        "title": "Purchase Register Batch Ingestion & Normalization",
+        "status": "PASS",
+        "evidence": {
+          "invoices_ingested": 3,
+          "total_itc_claimed": 63000.0
+        }
+      },
+      {
+        "step": 5,
+        "title": "8-Way GSTR-2B Reconciliation Execution",
+        "status": "PASS",
+        "evidence": {
+          "exact_matches": 1,
+          "value_mismatches": 1,
+          "missing_in_portal": 1
+        }
+      },
+      {
+        "step": 6,
+        "title": "Tax Value Mismatch & Vendor Variance Isolation",
+        "status": "PASS",
+        "evidence": {
+          "flagged_invoice": "PUR-02",
+          "tax_diff": 1800.0
+        }
+      },
+      {
+        "step": 7,
+        "title": "Section 17(5) Blocked ITC Ineligibility Scrutiny",
+        "status": "PASS",
+        "evidence": {
+          "blocked_rules_applied": 2,
+          "total_blocked_itc": 57000.0
+        }
+      },
+      {
+        "step": 8,
+        "title": "GSTR-3B Review Sign-Off & Status Transition to APPROVED",
+        "status": "PASS",
+        "evidence": {
+          "final_status": "APPROVED",
+          "approved_by": "CA Priya Patel"
+        }
+      },
+      {
+        "step": 9,
+        "title": "Standardized Tally XML Reversal Voucher Export",
+        "status": "PASS",
+        "evidence": {
+          "exported_bytes": 756,
+          "voucher_type": "Journal"
+        }
+      },
+      {
+        "step": 10,
+        "title": "Client Discrepancy Notification & Follow-Up Notice Delivery",
+        "status": "PASS",
+        "evidence": {
+          "notification_title": "Vendor ITC Mismatch Notice - Oct 2026",
+          "client_id": "6aef1d44573350bb68e67787"
+        }
+      }
+    ],
+    "pass_count": 10,
+    "fail_count": 0
+  },
+  "defects_found": [],
+  "workarounds_applied": []
+}

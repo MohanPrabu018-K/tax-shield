@@ -106,3 +106,4 @@ The pilot legal suite must align strictly with three Indian regulatory framework
 
 **Status:** Ready for submission to external Indian legal counsel.  
 **Outreach Status:** Marketing & initial discussions permitted; live client data ingestion held until counsel sign-off.
+
