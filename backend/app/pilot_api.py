@@ -304,3 +304,4 @@ async def get_all_feedback(admin: User = Depends(_require_admin)):
         "average_rating": avg_rating,
         "entries": [doc(e) for e in entries],
     }
+

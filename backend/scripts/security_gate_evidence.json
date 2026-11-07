@@ -1,0 +1,212 @@
+{
+  "audit_timestamp": "2026-11-07T11:29:34.467309+00:00",
+  "target_release": "TaxShield Professional v1.2.0",
+  "gates": {
+    "MFA_SECURITY": [
+      {
+        "test_id": "MFA-01",
+        "title": "Initial MFA Status Reports Disabled",
+        "status": "PASS",
+        "details": {
+          "mfa_enabled": false,
+          "has_recovery_codes": false,
+          "recovery_codes_remaining": 0
+        }
+      },
+      {
+        "test_id": "MFA-02",
+        "title": "MFA Setup Provisioning & Secret/QR Generation",
+        "status": "PASS",
+        "details": {
+          "has_secret": true,
+          "has_uri": true,
+          "has_qr": true,
+          "recovery_count": 8
+        }
+      },
+      {
+        "test_id": "MFA-03",
+        "title": "Reject Invalid TOTP Code on MFA Enable",
+        "status": "PASS",
+        "details": {
+          "status_code": 400,
+          "response": "{\"detail\":\"Invalid 6-digit verification code. Please check your authenticator clock.\"}"
+        }
+      },
+      {
+        "test_id": "MFA-04",
+        "title": "Valid TOTP Code Successfully Enables MFA",
+        "status": "PASS",
+        "details": {
+          "message": "Two-Factor Authentication is now actively protecting your account.",
+          "mfa_enabled": true
+        }
+      },
+      {
+        "test_id": "MFA-05",
+        "title": "Status Confirms Active MFA & 8 Recovery Codes Stored",
+        "status": "PASS",
+        "details": {
+          "mfa_enabled": true,
+          "has_recovery_codes": true,
+          "recovery_codes_remaining": 8
+        }
+      },
+      {
+        "test_id": "MFA-06",
+        "title": "Login Challenges MFA (Issues Ticket, Withholds Token)",
+        "status": "PASS",
+        "details": {
+          "mfa_required": true,
+          "has_ticket": true,
+          "token_blank": true
+        }
+      },
+      {
+        "test_id": "MFA-07",
+        "title": "Single-Use Recovery Code Successfully Authenticates",
+        "status": "PASS",
+        "details": {
+          "authenticated": true,
+          "recovery_code_used": true,
+          "remaining": 7
+        }
+      },
+      {
+        "test_id": "MFA-08",
+        "title": "Burned Recovery Code Cannot Be Re-used (401 Unauthorized)",
+        "status": "PASS",
+        "details": {
+          "status_code": 401,
+          "response": "{\"detail\":\"Invalid MFA code or recovery code.\"}"
+        }
+      }
+    ],
+    "TENANT_ISOLATION": [
+      {
+        "test_id": "ISO-01",
+        "title": "Barrier 1: Practice B Cannot List Practice A Clients",
+        "status": "PASS",
+        "details": {
+          "b_client_count": 0,
+          "leaked_c1": false
+        }
+      },
+      {
+        "test_id": "ISO-02",
+        "title": "Barrier 2: Practice B Fetching Client A1 Returns 404/403",
+        "status": "PASS",
+        "details": {
+          "status_code": 404
+        }
+      },
+      {
+        "test_id": "ISO-03",
+        "title": "Barrier 3: Practice B Cannot View Practice A Tasks",
+        "status": "PASS",
+        "details": {
+          "b_task_count": 0,
+          "leaked_t1": false
+        }
+      },
+      {
+        "test_id": "ISO-04",
+        "title": "Barrier 4: Practice B Cannot Transition Practice A Task (404 Not Found)",
+        "status": "PASS",
+        "details": {
+          "status_code": 404
+        }
+      },
+      {
+        "test_id": "ISO-05",
+        "title": "Barrier 5: Client User Cannot View Practice Workpapers",
+        "status": "PASS",
+        "details": {
+          "client_workpapers_count": 0
+        }
+      },
+      {
+        "test_id": "ISO-06",
+        "title": "Barrier 6: Practice B Cannot Access Practice A Invoices",
+        "status": "PASS",
+        "details": {
+          "status_code": 404
+        }
+      },
+      {
+        "test_id": "ISO-07",
+        "title": "Barrier 7: SQC-1 Maker-Checker Prevents Preparer Self-Approval",
+        "status": "PASS",
+        "details": {
+          "sqc1_rule_enforced": true
+        }
+      },
+      {
+        "test_id": "ISO-08",
+        "title": "Barrier 8: Unauthenticated Request Returns 401 Unauthorized",
+        "status": "PASS",
+        "details": {
+          "status_code": 401
+        }
+      }
+    ],
+    "DATA_REDACTION": [
+      {
+        "test_id": "RED-01",
+        "title": "Registration Withholds Plaintext Password",
+        "status": "PASS",
+        "details": {
+          "plaintext_password_leaked": false
+        }
+      },
+      {
+        "test_id": "RED-02",
+        "title": "User Me Response Omits Password Hash and MFA Secret",
+        "status": "PASS",
+        "details": {
+          "hashed_password_leaked": false,
+          "mfa_secret_leaked": false
+        }
+      }
+    ],
+    "BACKUP_RESTORE": [
+      {
+        "test_id": "BAK-01",
+        "title": "HMAC-SHA256 Manifest Seal Verification",
+        "status": "PASS",
+        "details": {
+          "verified": true,
+          "bad_files": []
+        }
+      },
+      {
+        "test_id": "BAK-02",
+        "title": "Cryptographic Tamper Detection Catches Altered Manifest",
+        "status": "PASS",
+        "details": {
+          "tamper_detected": true,
+          "errors": [
+            "manifest.json (seal mismatch)"
+          ]
+        }
+      },
+      {
+        "test_id": "BAK-03",
+        "title": "Full Database Restoration to Isolated Target",
+        "status": "PASS",
+        "details": {
+          "restored_canary_found": true,
+          "source_users": 198,
+          "restored_users": 198,
+          "source_audit_events": 470,
+          "restored_audit_events": 470
+        }
+      }
+    ]
+  },
+  "summary": {
+    "pass": 21,
+    "fail": 0,
+    "blocked": 0
+  }
+}

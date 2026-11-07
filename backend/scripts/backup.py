@@ -67,7 +67,7 @@ def backup(uri: str, db_name: str, out: Path, backend_root: Path,
         import shutil
 
         shutil.copytree(uploads, dest / "uploads")
-    secret = _seal_secret()
+    secret = _seal_secret(seal_secret)
     if secret:
         manifest["seal"] = {"algo": "HMAC-SHA256", "hmac": _seal(manifest, secret)}
     manifest_path = dest / "manifest.json"

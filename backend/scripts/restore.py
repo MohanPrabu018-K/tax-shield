@@ -16,11 +16,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.backup import verify  # noqa: E402
 
 
-def restore(backup_dir: Path, uri: str, db_name: str, dry_run: bool = True) -> dict:
+def restore(backup_dir: Path, uri: str, db_name: str, dry_run: bool = True,
+            secret: str | None = None) -> dict:
     from pymongo import MongoClient
     from bson.json_util import loads
 
-    rep = verify(backup_dir)
+    rep = verify(backup_dir, secret=secret)
     if not rep["ok"]:
         raise ValueError(f"backup failed verification: {rep['bad']}")
     manifest = json.loads((backup_dir / "manifest.json").read_text(encoding="utf-8"))

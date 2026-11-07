@@ -1,0 +1,282 @@
+[
+  {
+    "step_number": 1,
+    "title": "Pre-Onboarding Registration & User Account Creation",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:52.956919+00:00",
+    "details": {
+      "partner_email": "ca.partner.apex.396704@example.com",
+      "account_created": true
+    }
+  },
+  {
+    "step_number": 2,
+    "title": "Practice Profile Initialization & ICAI FRN Configuration",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:52.967319+00:00",
+    "details": {
+      "frn": "FRN-APEX-3967",
+      "firm_name": "Synthetic Firm: Apex Pilot CA"
+    }
+  },
+  {
+    "step_number": 3,
+    "title": "Managing Partner Session Validation",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:52.972366+00:00",
+    "details": {
+      "user_id": "6aef18d0573350bb68e672c1"
+    }
+  },
+  {
+    "step_number": 4,
+    "title": "RFC 6238 TOTP MFA Activation & 8 Recovery Codes Secured",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:53.010595+00:00",
+    "details": {
+      "mfa_enabled": true,
+      "recovery_codes_count": 8
+    }
+  },
+  {
+    "step_number": 5,
+    "title": "Staff Preparer Account Creation & Team Role Assignment",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:53.453498+00:00",
+    "details": {
+      "staff_email": "staff.preparer.apex.396704@example.com",
+      "role": "preparer"
+    }
+  },
+  {
+    "step_number": 6,
+    "title": "Client Master 360\u00b0 Profile Creation with PAN Validation",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:53.482763+00:00",
+    "details": {
+      "client_id": "6aef18d1573350bb68e672d0",
+      "pan": "AAACA9999A",
+      "entity_type": "pvt_ltd"
+    }
+  },
+  {
+    "step_number": 7,
+    "title": "Client Portal User Activation & Scoped Access",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:53.901583+00:00",
+    "details": {
+      "client_email": "client.rep.apex.396704@example.com"
+    }
+  },
+  {
+    "step_number": 8,
+    "title": "Engagement Letter Generation & ICAI UDIN Format Validation",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:53.917296+00:00",
+    "details": {
+      "engagement_id": "6aef18d1573350bb68e672d7",
+      "udin_sample": "24123456AAAAAA1234",
+      "udin_format_valid": true
+    }
+  },
+  {
+    "step_number": 9,
+    "title": "Tally Prime XML Parsing & Balanced Voucher Validation",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:53.925625+00:00",
+    "details": {
+      "ledgers_found": 2,
+      "vouchers_found": 1,
+      "valid_vouchers_count": 1,
+      "duplicate_count": 0,
+      "unbalanced_count": 0,
+      "warnings": [],
+      "sample_ledgers": [
+        {
+          "name": "Audit Fee Expense",
+          "tally_parent": "Indirect Expenses",
+          "account_type": "expense",
+          "opening_balance": 0.0,
+          "balance_type": "debit"
+        },
+        {
+          "name": "Apex Bank Account",
+          "tally_parent": "Bank Accounts",
+          "account_type": "asset",
+          "opening_balance": 500000.0,
+          "balance_type": "credit"
+        }
+      ],
+      "preview_vouchers": [
+        {
+          "voucher_type": "Journal",
+          "voucher_number": "JRN-PILOT-001",
+          "date": "2026-11-01",
+          "narration": "Provision for Statutory Audit Fee",
+          "entries": [
+            {
+              "ledger_name": "Audit Fee Expense",
+              "debit": 0.0,
+              "credit": 75000.0
+            },
+            {
+              "ledger_name": "Apex Bank Account",
+              "debit": 75000.0,
+              "credit": 0.0
+            }
+          ],
+          "total_debit": 75000.0,
+          "total_credit": 75000.0,
+          "is_balanced": true,
+          "is_duplicate": false
+        }
+      ]
+    }
+  },
+  {
+    "step_number": 10,
+    "title": "GSTR-2B 8-Way Automated ITC Reconciliation Run",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:53.925768+00:00",
+    "details": {
+      "matched": 1,
+      "missing_in_portal": 1
+    }
+  },
+  {
+    "step_number": 11,
+    "title": "Deterministic Statutory Tax Rules & Rebate Thresholds Verification",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:54.720349+00:00",
+    "details": {
+      "base": 37500.0,
+      "rebate": 0.0,
+      "surcharge": 0.0,
+      "cess": 1500.0
+    }
+  },
+  {
+    "step_number": 12,
+    "title": "Section 115BAC Comparative Tax Computation (Old vs New)",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:54.720535+00:00",
+    "details": {
+      "income": 1500000,
+      "new_regime_tax": 156000.0,
+      "old_regime_tax": 195000.0,
+      "tax_saved_in_new": 39000.0
+    }
+  },
+  {
+    "step_number": 13,
+    "title": "SA 230 Audit Workpaper & Lead Schedule Generation",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:54.743220+00:00",
+    "details": {
+      "workpapers_found": 1,
+      "lead_schedule": "A-1"
+    }
+  },
+  {
+    "step_number": 14,
+    "title": "Professional Task Creation with 12-State Workflow Tracking",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:54.754366+00:00",
+    "details": {
+      "task_id": "6aef18d2573350bb68e672dc",
+      "status": "NOT_STARTED",
+      "assigned_to": "Pooja Nair (Synthetic Staff)"
+    }
+  },
+  {
+    "step_number": 15,
+    "title": "SQC-1 Dual-Control Maker-Checker Partner Signoff & Approval",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:54.801061+00:00",
+    "details": {
+      "final_task_status": "APPROVED",
+      "approved_by": "CA Ankit Varma (Synthetic)"
+    }
+  },
+  {
+    "step_number": 16,
+    "title": "Client Portal Document Request Delivery & Scoped Verification",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:54.816710+00:00",
+    "details": {
+      "pending_documents_count": 1
+    }
+  },
+  {
+    "step_number": 17,
+    "title": "Statutory Practice Fee Invoicing with 18% GST Breakdown",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:54.850704+00:00",
+    "details": {
+      "invoice_number": "INV-2026-27-0001",
+      "taxable_amount": 75000.0,
+      "total_gst": 13500.0,
+      "total_with_gst": 88500.0
+    }
+  },
+  {
+    "step_number": 18,
+    "title": "Practice Dashboard Attention Center & Fee Ageing Telemetry",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:54.870837+00:00",
+    "details": {
+      "practice_kpis": {
+        "total_clients": 1,
+        "active_clients": 1,
+        "open_tasks": 0,
+        "overdue_tasks": 0,
+        "pending_reviews": 0,
+        "pending_documents": 1,
+        "total_billed": 0.0,
+        "total_collected": 0.0,
+        "total_outstanding": 0.0
+      },
+      "urgent_items_count": 0
+    }
+  },
+  {
+    "step_number": 19,
+    "title": "Pilot Cohort In-App Feedback Collection",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:54.882900+00:00",
+    "details": {
+      "feedback_id": "6aef18d2573350bb68e67309",
+      "rating": 5
+    }
+  },
+  {
+    "step_number": 20,
+    "title": "Full Zero-Cost Practice Data Export (Tally XML & Data Portability)",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:54.897053+00:00",
+    "details": {
+      "export_xml_bytes": 734,
+      "portable_format": "Tally Prime XML"
+    }
+  },
+  {
+    "step_number": 21,
+    "title": "Cryptographic Disaster Recovery Backup Drill (HMAC Sealed)",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:55.560167+00:00",
+    "details": {
+      "backup_dir": "D:\\tax shield\\tax shield\\tax-shield\\backend\\backups\\onboarding_dry_run\\taxshield-20261107-122554",
+      "manifest_verified": true
+    }
+  },
+  {
+    "step_number": 22,
+    "title": "Clean Exit & Cryptographic Decommission Rehearsal",
+    "status": "SUCCESS",
+    "timestamp": "2026-11-07T12:25:55.567183+00:00",
+    "details": {
+      "remaining_synthetic_clients": 0,
+      "decommission_status": "CLEAN"
+    }
+  }
+]

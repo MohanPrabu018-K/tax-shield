@@ -2,9 +2,16 @@
 node_modules/
 venv/
 .venv/
+
+# Environment & Secrets (Never commit secrets)
 .env
-.env.local
-.env.*.local
+.env.*
+.env.pilot
+**/.env
+**/.env.*
+**/.env.pilot
+!**/.env.example
+!**/.env.*.example
 
 # Build outputs
 .next/
@@ -59,6 +66,10 @@ playwright/.cache/
 
 # Uploads
 uploads/
+
+# Backups
+backups/
+backend/backups/
 
 # Docker
 .docker/*.tsbuildinfo

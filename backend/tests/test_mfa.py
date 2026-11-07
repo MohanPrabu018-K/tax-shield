@@ -174,3 +174,4 @@ def test_mfa_api_full_lifecycle():
     login_res4 = requests.post(f"{API}/login", json={"email": email, "password": password}).json()
     assert login_res4.get("mfa_required") is False
     assert login_res4["access_token"]
+

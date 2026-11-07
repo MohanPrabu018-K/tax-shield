@@ -262,3 +262,4 @@ def export_to_tally_xml(journals: List[Dict[str, Any]], company_name: str = "Tax
                 amt.text = f"{dr:.2f}"
 
     return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
+

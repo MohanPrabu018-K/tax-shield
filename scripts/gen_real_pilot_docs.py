@@ -18,3 +18,4 @@ def write_doc(filename: str, content: str):
     print(f"Generated: {filename} ({len(content)} bytes)")
 
 print("Ready to generate Real CA Firm Pilot documents.")
+

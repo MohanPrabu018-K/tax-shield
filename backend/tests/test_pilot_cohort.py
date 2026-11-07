@@ -103,3 +103,4 @@ def test_customer_feedback_collection():
     feedbacks = requests.get(f"{API}/admin/pilot/feedback", headers=H_admin).json()
     assert feedbacks["total_feedback_count"] >= 1
     assert feedbacks["average_rating"] >= 1.0
+

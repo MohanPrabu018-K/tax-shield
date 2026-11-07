@@ -190,3 +190,4 @@ def test_export_to_tally_xml():
     assert "<VOUCHERNUMBER>JRN-001</VOUCHERNUMBER>" in xml_out
     assert "<AMOUNT>15000.00</AMOUNT>" in xml_out
     assert "<AMOUNT>-15000.00</AMOUNT>" in xml_out
+

@@ -229,3 +229,4 @@ for filename, content in DOCS.items():
     print(f"Generated legal doc: {filename} ({len(content)} bytes)")
 
 print("All 5 pilot legal and governance documents generated.")
+

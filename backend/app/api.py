@@ -135,7 +135,7 @@ async def login(request: Request):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.get("/me", response_model=User)
+@router.get("/me", response_model=User, response_model_exclude={"hashed_password", "mfa_secret", "mfa_pending_secret", "mfa_recovery_codes"})
 async def get_current_user_info(current_user: User = Depends(get_current_active_user)):
     return current_user
 
