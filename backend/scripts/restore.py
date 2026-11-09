@@ -17,7 +17,7 @@ from scripts.backup import verify  # noqa: E402
 
 
 def restore(backup_dir: Path, uri: str, db_name: str, dry_run: bool = True,
-            secret: str | None = None) -> dict:
+            secret: str | list[str] | None = None) -> dict:
     from pymongo import MongoClient
     from bson.json_util import loads
 

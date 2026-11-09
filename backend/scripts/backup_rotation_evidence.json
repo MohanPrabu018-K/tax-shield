@@ -1,0 +1,46 @@
+{
+  "status": "PASSED",
+  "total_checks": 7,
+  "passed_checks": 7,
+  "results": [
+    {
+      "check": "LEGACY_VERIFY_WITH_NEW_KEY_FAILS",
+      "description": "Legacy backup rejected when verified with rotated key alone",
+      "passed": true,
+      "details": [
+        "manifest.json (seal mismatch)"
+      ]
+    },
+    {
+      "check": "LEGACY_RESTORE_WITH_NEW_KEY_BLOCKED",
+      "description": "Legacy backup restore blocked when verified with rotated key alone",
+      "passed": true
+    },
+    {
+      "check": "LEGACY_VERIFY_WITH_HISTORICAL_KEY_SUCCESS",
+      "description": "Legacy backup successfully verifies when provided historical key",
+      "passed": true
+    },
+    {
+      "check": "MULTI_KEY_FALLBACK_SUCCESS",
+      "description": "Legacy backup verifies seamlessly via multi-key fallback list",
+      "passed": true
+    },
+    {
+      "check": "NEW_BACKUP_VERIFY_WITH_ROTATED_KEY_SUCCESS",
+      "description": "New backup successfully verifies with rotated key",
+      "passed": true
+    },
+    {
+      "check": "NEW_BACKUP_RESTORE_SUCCESS",
+      "description": "New backup dry-run and live restore succeed under rotated key",
+      "passed": true,
+      "collections_restored": 27
+    },
+    {
+      "check": "ROTATED_BACKUP_TAMPER_DETECTION",
+      "description": "Cryptographic tamper detection immediately catches tampered manifest",
+      "passed": true
+    }
+  ]
+}

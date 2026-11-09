@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     MIN_PASSWORD_LEN: int = 8
     # Pilot environment & backup seal
     BACKUP_SEAL_SECRET: str | None = None
+    BACKUP_SEAL_PREVIOUS_SECRETS: str | None = None
     ZERO_COST_POLICY: str = "ENFORCED"
 
     class Config:

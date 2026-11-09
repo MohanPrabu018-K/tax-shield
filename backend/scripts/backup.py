@@ -44,7 +44,7 @@ def _seal_secret(explicit: str | None = None) -> str | None:
 
 
 def backup(uri: str, db_name: str, out: Path, backend_root: Path,
-           seal_secret: str | None = None) -> Path:
+           seal_secret: str | None = None, key_id: str | None = None) -> Path:
     from pymongo import MongoClient
     from bson.json_util import dumps
 
@@ -69,24 +69,44 @@ def backup(uri: str, db_name: str, out: Path, backend_root: Path,
         shutil.copytree(uploads, dest / "uploads")
     secret = _seal_secret(seal_secret)
     if secret:
-        manifest["seal"] = {"algo": "HMAC-SHA256", "hmac": _seal(manifest, secret)}
+        seal_entry = {"algo": "HMAC-SHA256", "hmac": _seal(manifest, secret)}
+        if key_id:
+            seal_entry["key_id"] = key_id
+        manifest["seal"] = seal_entry
     manifest_path = dest / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return dest
 
 
-def verify(backup_dir: Path, secret: str | None = None) -> dict:
+def verify(backup_dir: Path, secret: str | list[str] | None = None) -> dict:
     manifest = json.loads((backup_dir / "manifest.json").read_text(encoding="utf-8"))
     bad = []
     # Manifest seal (closes the P15 gap): HMAC over everything except the seal.
     seal = manifest.get("seal")
-    key = secret if secret is not None else os.environ.get("BACKUP_SEAL_SECRET")
-    if seal and key:
+    candidate_keys: list[str] = []
+    if secret:
+        if isinstance(secret, (list, tuple)):
+            candidate_keys.extend([str(k) for k in secret if k])
+        elif "," in str(secret):
+            candidate_keys.extend([k.strip() for k in str(secret).split(",") if k.strip()])
+        else:
+            candidate_keys.append(str(secret))
+    else:
+        env_current = os.environ.get("BACKUP_SEAL_SECRET")
+        if env_current:
+            candidate_keys.append(env_current)
+        env_prev = os.environ.get("BACKUP_SEAL_PREVIOUS_SECRETS")
+        if env_prev:
+            candidate_keys.extend([k.strip() for k in env_prev.split(",") if k.strip()])
+
+    if seal and candidate_keys:
         body = {k: v for k, v in manifest.items() if k != "seal"}
-        if _seal(body, key) != seal.get("hmac"):
+        expected_hmac = seal.get("hmac")
+        verified = any(_seal(body, k) == expected_hmac for k in candidate_keys)
+        if not verified:
             return {"ok": False, "bad": ["manifest.json (seal mismatch)"],
                     "counts": {}}
-    elif seal and not key:
+    elif seal and not candidate_keys:
         bad.append("manifest.json (sealed but no secret provided to verify)")
     for rel, digest in manifest.get("files", {}).items():
         fp = backup_dir / rel
